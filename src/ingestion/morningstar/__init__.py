@@ -1,0 +1,1 @@
+"""Morningstar data ingestion."""

@@ -134,6 +134,14 @@ def format_market_state(state: dict) -> str:
         lines.append("- N/A")
     lines.append("")
 
+    # --- Morningstar Fundamentals (if available in macro_map) ---
+    macro_map_parsed = _safe_json(state.get("macro_map"))
+    ms_data = macro_map_parsed.get("morningstar", {}) if isinstance(macro_map_parsed, dict) else {}
+    if ms_data and ms_data.get("stocks"):
+        from src.ingestion.morningstar.fundamentals import format_for_agents
+        lines.append(format_for_agents(ms_data["stocks"]))
+        lines.append("")
+
     # --- Sector Sensitivities ---
     sectors = load_sector_sensitivities()
     if sectors:
