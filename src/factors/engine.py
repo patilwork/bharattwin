@@ -101,7 +101,7 @@ def compute(d: date) -> dict[str, Any] | None:
         # --- Multi-day factors (5d, 20d momentum + 20d vol) ---
         # Fetch historical market-level returns from already-built market_state rows
         lookback_dates = []
-        for i in range(1, 25):  # up to 25 calendar days back to get ~20 trading days
+        for i in range(1, 40):  # up to 40 calendar days back to get ~20 trading days
             lookback_dates.append(d - timedelta(days=i))
 
         hist_rows = conn.execute(text("""

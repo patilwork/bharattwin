@@ -264,3 +264,24 @@ def test_replay_prompt_mode():
     result = run_replay(mode="prompt")
     assert isinstance(result, list)
     assert len(result) == 8
+
+
+# --- 8. In-Context Replay ---
+
+def test_incontext_replay_consensus():
+    """In-context replay produces correct consensus direction and reasonable error."""
+    from src.replay.run_incontext_007 import run_incontext_replay
+    from src.replay.cases.rbi_hike_may2022 import ACTUAL_NIFTY_RETURN_PCT
+
+    consensus = run_incontext_replay()
+
+    # Direction must be SELL (actual was -2.29%)
+    assert consensus.consensus_direction == Direction.SELL
+    # All 8 agents should be bearish for this event
+    assert consensus.bear_count == 8
+    assert consensus.bull_count == 0
+    # Prediction error should be under 1 percentage point
+    error = abs(consensus.avg_return_pct - ACTUAL_NIFTY_RETURN_PCT)
+    assert error < 1.0, f"Prediction error {error:.2f}pp exceeds 1pp threshold"
+    # Actual should fall within the predicted range
+    assert consensus.return_range.low_pct <= ACTUAL_NIFTY_RETURN_PCT <= consensus.return_range.high_pct
