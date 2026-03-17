@@ -135,40 +135,73 @@ def _composite_score(scores: dict) -> float:
     return dir_pct * 0.6 + inv_error * 0.2 + big_dir * 0.2
 
 
+def _interleaved_split(results: list, window_days: int = 10) -> tuple[list, list]:
+    """
+    Split results into train/test using interleaved windows.
+
+    Instead of train=first70% / test=last30% (which biases by era),
+    alternate windows across the full period so both sets see every
+    market regime.
+
+    Example with window=10:
+      Days 1-10:  TRAIN
+      Days 11-20: TEST
+      Days 21-30: TRAIN
+      Days 31-40: TEST
+      ...
+
+    This ensures:
+      - Train and test both contain 2008 GFC, 2014 Modi, 2020 COVID, etc.
+      - Parameters must generalize across eras, not memorize one period
+      - ~50/50 split naturally (slight variation due to remainder)
+    """
+    train, test = [], []
+    for i, r in enumerate(results):
+        bucket = (i // window_days) % 2  # alternates 0,1,0,1,...
+        if bucket == 0:
+            train.append(r)
+        else:
+            test.append(r)
+    return train, test
+
+
 def run_autoresearch(
     n_experiments: int = 100,
     temperature: float = 0.15,
     cooling: bool = True,
-    train_pct: float = 0.70,
+    window_days: int = 10,
 ) -> dict:
     """
-    Run the autoresearch optimization loop with train/test split.
+    Run the autoresearch optimization loop with interleaved train/test split.
 
-    Optimizes on train set (first 70% of days by default),
-    validates on test set (last 30%) to detect overfitting.
+    Uses alternating windows (default 10 trading days ≈ 2 weeks) across
+    the full 20-year period. Both train and test contain data from every
+    market regime — no era bias.
 
     Args:
         n_experiments: Number of experiments to run.
         temperature: Initial mutation magnitude (0.05-0.3).
         cooling: If True, reduce temperature over time (simulated annealing).
-        train_pct: Fraction of data for training (default 0.70).
+        window_days: Size of each train/test window in trading days.
+            5  = weekly alternation (most mixing, some autocorrelation leak)
+            10 = biweekly alternation (good balance)
+            20 = monthly alternation (cleanest separation)
 
     Returns:
         Best parameters found and their score.
     """
     global BEST_PARAMS, BEST_SCORE
 
-    # Establish baseline on full dataset
+    # Establish baseline
     print("Establishing baseline...")
     all_results = run_full_backtest(PARAMS)
 
-    # Train/test split (temporal — no leakage)
-    split_idx = int(len(all_results) * train_pct)
-    train_results = all_results[:split_idx]
-    test_results = all_results[split_idx:]
-    print(f"Split: {len(train_results)} train / {len(test_results)} test "
-          f"({train_results[0].date}–{train_results[-1].date} | "
-          f"{test_results[0].date}–{test_results[-1].date})")
+    # Interleaved split
+    train_results, test_results = _interleaved_split(all_results, window_days)
+    print(f"Interleaved split (window={window_days}d): "
+          f"{len(train_results)} train / {len(test_results)} test")
+    print(f"  Train spans: {train_results[0].date} to {train_results[-1].date}")
+    print(f"  Test spans:  {test_results[0].date} to {test_results[-1].date}")
 
     baseline_scores = score_results(train_results)
     baseline_test_scores = score_results(test_results)
@@ -196,7 +229,7 @@ def run_autoresearch(
 
         # Evaluate on TRAIN set only (prevents overfitting)
         all_res = run_full_backtest(candidate)
-        train_res = all_res[:split_idx]
+        train_res, _ = _interleaved_split(all_res, window_days)
         scores = score_results(train_res)
         composite = _composite_score(scores)
 
@@ -235,33 +268,40 @@ def run_autoresearch(
 
     # Final evaluation on BOTH train and test
     best_all = run_full_backtest(BEST_PARAMS)
-    best_train = best_all[:split_idx]
-    best_test = best_all[split_idx:]
+    best_train, best_test = _interleaved_split(best_all, window_days)
     best_train_scores = score_results(best_train)
     best_test_scores = score_results(best_test)
+    best_full_scores = score_results(best_all)
 
     print(f"\n{'=' * 70}")
     print(f"AUTORESEARCH COMPLETE — {n_experiments} experiments in {elapsed:.0f}s ({rate:.1f}/s)")
+    print(f"  Split: interleaved {window_days}d windows across full 20yr period")
     print(f"{'=' * 70}")
     print(f"  Improvements: {improvements}")
     print(f"")
-    print(f"  TRAIN ({len(best_train)} days: {best_train[0].date}–{best_train[-1].date}):")
+    print(f"  TRAIN ({len(best_train)} days, interleaved):")
     print(f"    Baseline: dir={baseline_scores['direction_pct']}% err={baseline_scores['avg_error_pp']}pp")
     print(f"    Best:     dir={best_train_scores['direction_pct']}% err={best_train_scores['avg_error_pp']}pp")
     print(f"    Composite: {baseline_composite:.2f} → {BEST_SCORE:.2f} "
           f"({'+' if BEST_SCORE > baseline_composite else ''}{BEST_SCORE - baseline_composite:.2f})")
     print(f"")
-    print(f"  TEST ({len(best_test)} days: {best_test[0].date}–{best_test[-1].date}):")
+    print(f"  TEST ({len(best_test)} days, interleaved):")
     print(f"    Baseline: dir={baseline_test_scores['direction_pct']}% err={baseline_test_scores['avg_error_pp']}pp")
     print(f"    Best:     dir={best_test_scores['direction_pct']}% err={best_test_scores['avg_error_pp']}pp")
 
     # Overfit check
     train_gain = best_train_scores['direction_pct'] - baseline_scores['direction_pct']
     test_gain = best_test_scores['direction_pct'] - baseline_test_scores['direction_pct']
-    if test_gain < 0 and train_gain > 1:
-        print(f"    ⚠️  OVERFIT WARNING: train +{train_gain:.1f}pp but test {test_gain:+.1f}pp")
-    elif test_gain >= 0:
-        print(f"    ✅ Generalizes: train +{train_gain:.1f}pp, test +{test_gain:.1f}pp")
+    if test_gain < -0.5 and train_gain > 1:
+        print(f"    ⚠️  OVERFIT: train +{train_gain:.1f}pp but test {test_gain:+.1f}pp")
+    elif test_gain >= train_gain * 0.5:
+        print(f"    ✅ Generalizes well: train +{train_gain:.1f}pp, test +{test_gain:.1f}pp")
+    else:
+        print(f"    ⚠️  Partial overfit: train +{train_gain:.1f}pp, test +{test_gain:.1f}pp")
+
+    print(f"")
+    print(f"  FULL ({len(best_all)} days combined):")
+    print(f"    dir={best_full_scores['direction_pct']}% err={best_full_scores['avg_error_pp']}pp")
 
     print(f"\n  Optimized parameters:")
     for k, v in sorted(BEST_PARAMS.items()):
@@ -287,8 +327,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--n", type=int, default=100)
     parser.add_argument("--temp", type=float, default=0.15)
+    parser.add_argument("--window", type=int, default=10,
+                        help="Train/test window size in trading days (5=weekly, 10=biweekly, 20=monthly)")
     parser.add_argument("--no-cooling", action="store_true")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.WARNING)
-    run_autoresearch(args.n, args.temp, not args.no_cooling)
+    run_autoresearch(args.n, args.temp, not args.no_cooling, args.window)
