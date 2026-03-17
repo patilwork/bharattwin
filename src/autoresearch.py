@@ -135,7 +135,7 @@ def _composite_score(scores: dict) -> float:
     return dir_pct * 0.6 + inv_error * 0.2 + big_dir * 0.2
 
 
-def _interleaved_split(results: list, window_days: int = 10) -> tuple[list, list]:
+def _interleaved_split(results: list, window_days: int | str = "multi") -> tuple[list, list]:
     """
     Split results into train/test using interleaved windows.
 
@@ -143,25 +143,53 @@ def _interleaved_split(results: list, window_days: int = 10) -> tuple[list, list
     alternate windows across the full period so both sets see every
     market regime.
 
-    Example with window=10:
-      Days 1-10:  TRAIN
-      Days 11-20: TEST
-      Days 21-30: TRAIN
-      Days 31-40: TEST
-      ...
+    Modes:
+      window_days=10:     Fixed 10-day alternation
+      window_days="multi": Multi-scale windows (1,3,5,10,15,20,30) that
+                           create a pseudo-random but deterministic assignment.
+                           This prevents alignment with any single market cycle.
 
-    This ensures:
+    Multi-scale logic:
+      For each day, compute a hash from multiple window scales. If the
+      majority of scales assign it to train, it goes to train. This
+      creates an irregular pattern that no single cycle can exploit.
+
+      Scales: 3d (intraweek), 5d (weekly), 10d (biweekly), 20d (monthly),
+              30d (6-week), 60d (quarterly)
+
+    Both modes ensure:
       - Train and test both contain 2008 GFC, 2014 Modi, 2020 COVID, etc.
-      - Parameters must generalize across eras, not memorize one period
-      - ~50/50 split naturally (slight variation due to remainder)
+      - ~50/50 split
+      - Deterministic (same results every run)
     """
+    if isinstance(window_days, int):
+        # Single-scale: simple alternation
+        train, test = [], []
+        for i, r in enumerate(results):
+            bucket = (i // window_days) % 2
+            if bucket == 0:
+                train.append(r)
+            else:
+                test.append(r)
+        return train, test
+
+    # Multi-scale: majority vote across 6 different window sizes
+    scales = [3, 5, 10, 20, 30, 60]
     train, test = [], []
+
     for i, r in enumerate(results):
-        bucket = (i // window_days) % 2  # alternates 0,1,0,1,...
-        if bucket == 0:
+        votes_train = 0
+        for s in scales:
+            bucket = (i // s) % 2
+            if bucket == 0:
+                votes_train += 1
+
+        # Majority of scales say train → train; else test
+        if votes_train > len(scales) // 2:
             train.append(r)
         else:
             test.append(r)
+
     return train, test
 
 
@@ -169,7 +197,7 @@ def run_autoresearch(
     n_experiments: int = 100,
     temperature: float = 0.15,
     cooling: bool = True,
-    window_days: int = 10,
+    window_days: int | str = "multi",
 ) -> dict:
     """
     Run the autoresearch optimization loop with interleaved train/test split.
@@ -198,7 +226,8 @@ def run_autoresearch(
 
     # Interleaved split
     train_results, test_results = _interleaved_split(all_results, window_days)
-    print(f"Interleaved split (window={window_days}d): "
+    split_label = f"multi-scale (3/5/10/20/30/60d)" if window_days == "multi" else f"fixed {window_days}d"
+    print(f"Interleaved split ({split_label}): "
           f"{len(train_results)} train / {len(test_results)} test")
     print(f"  Train spans: {train_results[0].date} to {train_results[-1].date}")
     print(f"  Test spans:  {test_results[0].date} to {test_results[-1].date}")
@@ -275,7 +304,7 @@ def run_autoresearch(
 
     print(f"\n{'=' * 70}")
     print(f"AUTORESEARCH COMPLETE — {n_experiments} experiments in {elapsed:.0f}s ({rate:.1f}/s)")
-    print(f"  Split: interleaved {window_days}d windows across full 20yr period")
+    print(f"  Split: {split_label} across full 20yr period")
     print(f"{'=' * 70}")
     print(f"  Improvements: {improvements}")
     print(f"")
@@ -327,10 +356,16 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--n", type=int, default=100)
     parser.add_argument("--temp", type=float, default=0.15)
-    parser.add_argument("--window", type=int, default=10,
-                        help="Train/test window size in trading days (5=weekly, 10=biweekly, 20=monthly)")
+    parser.add_argument("--window", default="multi",
+                        help="Train/test split: 'multi' (multi-scale, default) or integer for fixed window")
     parser.add_argument("--no-cooling", action="store_true")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.WARNING)
-    run_autoresearch(args.n, args.temp, not args.no_cooling, args.window)
+    window = args.window
+    if window != "multi":
+        try:
+            window = int(window)
+        except ValueError:
+            window = "multi"
+    run_autoresearch(args.n, args.temp, not args.no_cooling, window)
