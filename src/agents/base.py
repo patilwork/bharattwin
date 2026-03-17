@@ -23,7 +23,9 @@ logger = logging.getLogger(__name__)
 
 
 def _has_api_key() -> bool:
-    return bool(os.environ.get("ANTHROPIC_API_KEY"))
+    from src.agents.llm_providers import has_api_key, get_provider
+    # Check current provider first, then anthropic as fallback
+    return has_api_key() or has_api_key("anthropic")
 
 
 class BaseAgent:
@@ -106,18 +108,14 @@ class BaseAgent:
         raise ValueError(f"Unknown mode: {mode}")
 
     def _call_api(self, system: str, user: str) -> AgentDecision:
-        """Call Anthropic API and parse response into AgentDecision."""
-        import anthropic
+        """Call LLM API (Anthropic, Sarvam, or OpenAI-compatible) and parse response."""
+        from src.agents.llm_providers import call_llm
 
-        client = anthropic.Anthropic()
-        response = client.messages.create(
-            model=self.persona.model,
-            max_tokens=2048,
+        raw_text = call_llm(
             system=system,
-            messages=[{"role": "user", "content": user}],
+            user=user,
+            model=self.persona.model,
         )
-
-        raw_text = response.content[0].text
         return self._parse_response(raw_text)
 
     def _parse_response(self, raw: str) -> AgentDecision:
