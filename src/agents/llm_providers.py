@@ -170,7 +170,7 @@ def _call_openai_compat(system: str, user: str, model: str, max_tokens: int,
                 {"role": "assistant", "content": "I have analyzed the market data. I will now provide my prediction as a JSON object."},
                 {"role": "user", "content": json_demand},
             ],
-            "reasoning_effort": "low",
+            "reasoning_effort": "medium",
             "temperature": 0,
             "max_tokens": 4096,
         }
