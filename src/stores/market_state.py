@@ -173,13 +173,16 @@ def build(d: date, force: bool = False) -> dict[str, Any] | None:
     # Upsert into market_state
     with engine.begin() as conn:
         if force:
+            # COALESCE: never overwrite non-NULL index prices/macro with NULL.
+            # This lets build() be safe to call regardless of whether Zerodha
+            # index prices have been populated before or after.
             conflict_action = """DO UPDATE SET
-                nifty50_close = EXCLUDED.nifty50_close,
-                banknifty_close = EXCLUDED.banknifty_close,
-                india_vix = EXCLUDED.india_vix,
-                repo_rate_pct = EXCLUDED.repo_rate_pct,
-                usdinr_ref = EXCLUDED.usdinr_ref,
-                crude_indian_basket_usd = EXCLUDED.crude_indian_basket_usd,
+                nifty50_close = COALESCE(EXCLUDED.nifty50_close, market_state.nifty50_close),
+                banknifty_close = COALESCE(EXCLUDED.banknifty_close, market_state.banknifty_close),
+                india_vix = COALESCE(EXCLUDED.india_vix, market_state.india_vix),
+                repo_rate_pct = COALESCE(EXCLUDED.repo_rate_pct, market_state.repo_rate_pct),
+                usdinr_ref = COALESCE(EXCLUDED.usdinr_ref, market_state.usdinr_ref),
+                crude_indian_basket_usd = COALESCE(EXCLUDED.crude_indian_basket_usd, market_state.crude_indian_basket_usd),
                 returns_map = EXCLUDED.returns_map,
                 flow_map = EXCLUDED.flow_map,
                 macro_map = EXCLUDED.macro_map,

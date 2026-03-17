@@ -126,7 +126,18 @@ def replay_scoreboard() -> None:
     except Exception as e:
         cases.append(("Election June 2024", None, None, None, "ERR", str(e)[:20]))
 
-    # Case 3: Live sim Mar 16→17
+    # Case 3: Exit Poll June 2024 (POSITIVE)
+    try:
+        from src.replay.run_exitpoll_011 import run_exitpoll_replay
+        from src.replay.cases.exit_poll_june2024 import ACTUAL_NIFTY_RETURN_PCT as exit_actual
+        c_exit = _run_silent(run_exitpoll_replay)
+        dir_ok_exit = "YES" if c_exit.consensus_direction.value == "BUY" else "NO"
+        error_exit = abs(c_exit.avg_return_pct - exit_actual)
+        cases.append(("Exit Poll June 2024 (BUY)", exit_actual, c_exit.avg_return_pct, error_exit, dir_ok_exit, f"{c_exit.bear_count}B/{c_exit.bull_count}L/{c_exit.neutral_count}H"))
+    except Exception as e:
+        cases.append(("Exit Poll June 2024 (BUY)", None, None, None, "ERR", str(e)[:20]))
+
+    # Case 4: Live sim Mar 16→17
     try:
         from src.replay.run_live_008 import run_live_simulation, ACTUAL_NIFTY_RETURN_PCT as live_actual
         c3 = _run_silent(run_live_simulation)

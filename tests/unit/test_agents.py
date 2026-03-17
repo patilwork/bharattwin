@@ -359,3 +359,17 @@ def test_election_replay_consensus():
     error = abs(consensus.avg_return_pct - ACTUAL_NIFTY_RETURN_PCT)
     assert error < 2.0, f"Prediction error {error:.2f}pp exceeds 2pp threshold"
     assert consensus.return_range.low_pct <= ACTUAL_NIFTY_RETURN_PCT <= consensus.return_range.high_pct
+
+
+def test_exitpoll_replay_consensus():
+    """Exit poll 2024 replay (BUY case): direction correct and error under 1pp."""
+    from src.replay.run_exitpoll_011 import run_exitpoll_replay
+    from src.replay.cases.exit_poll_june2024 import ACTUAL_NIFTY_RETURN_PCT
+
+    consensus = run_exitpoll_replay()
+
+    assert consensus.consensus_direction == Direction.BUY
+    assert consensus.bull_count == 8
+    error = abs(consensus.avg_return_pct - ACTUAL_NIFTY_RETURN_PCT)
+    assert error < 1.0, f"Prediction error {error:.2f}pp exceeds 1pp threshold"
+    assert consensus.return_range.low_pct <= ACTUAL_NIFTY_RETURN_PCT <= consensus.return_range.high_pct
