@@ -2,7 +2,7 @@
 
 **1 million AI agents that predict the Indian stock market. Every day. With a public scoreboard.**
 
-BharatTwin is an open-source swarm intelligence engine built specifically for the Indian equity market. Eight specialist archetypes — from FII quant strategists to retail momentum traders — each spawn up to 125,000 agent variants across 12 personality dimensions (672 million unique combinations). The swarm analyzes live NSE data and produces a population-level consensus Nifty 50 prediction.
+BharatTwin is an open-source swarm intelligence engine built specifically for the Indian equity market. Ten specialist archetypes — from FII quant strategists to Rajkot dabba speculators — each spawn up to 100,000 agent variants across 12 personality dimensions (96.7 billion unique combinations). The swarm analyzes live NSE data and produces a population-level consensus Nifty 50 prediction.
 
 Think [MiroFish](https://github.com/666ghj/MiroFish) but purpose-built for Indian markets. Where MiroFish simulates generic social agents, BharatTwin simulates **the actual participants of Dalal Street** — FIIs, DIIs, dealers, retail traders, macro strategists — each with India-specific knowledge, regional biases, and behavioral profiles. Powered by [Sarvam 105B](https://www.sarvam.ai/models) (India-built LLM) or Claude.
 
@@ -16,20 +16,23 @@ NSE Bhavcopy + Zerodha + RBI + Morningstar
       Market State Builder
               ↓
     ┌─────────────────────────┐
-    │  8 AI Agent Personas    │
+    │  10 AI Agent Archetypes  │
     │                         │
     │  🏦 FII Quant           │  ← Global macro, FII flows, USD/INR
     │  📈 Retail Momentum     │  ← Price action, breadth, FOMO/panic
-    │  🎰 Dealer Hedging      │  ← VIX, gamma, options positioning
+    │  🎰 Dealer Hedging      │  ← VIX, gamma, options OI, max pain
     │  🏛️ DII Mutual Fund     │  ← SIP flows, valuations, contrarian
     │  🌍 Macro Strategist    │  ← RBI policy, crude, inflation
     │  🔄 Sector Rotation     │  ← Rate/FX/oil sensitivity matrix
     │  📊 Corp Earnings       │  ← Bottom-up, heavyweight analysis
     │  ⚡ Event/News Trader   │  ← Breaking news, historical patterns
+    │  🕶️ Operator            │  ← Syndicate, pump networks, mid-cap spillover
+    │  🎲 Dabba Speculator    │  ← Rajkot/Indore satta, leverage, herd
     │                         │
     └─────────────────────────┘
               ↓
-   Conviction-Weighted Consensus
+   1M Agent Swarm Amplification
+     (regime-conditional weights)
               ↓
      Direction | Return Range | Confidence
               ↓
@@ -92,21 +95,25 @@ python -m src.calibration
 
 ## Architecture
 
-- **Ingestion:** NSE bhavcopy, FII/DII flows, Zerodha index prices, RBI rates, Morningstar fundamentals
-- **State:** PostgreSQL with typed columns + JSONB for flexible data
-- **Agents:** 8 personas with unique biases, focus areas, and conviction patterns
-- **Consensus:** Conviction-weighted aggregation with HOLD-majority respect
-- **Scoring:** Automated comparison of predictions vs actual outcomes
+- **Ingestion:** NSE bhavcopy, FII/DII flows, Zerodha index + F&O OI, RBI rates, Morningstar fundamentals
+- **State:** PostgreSQL with typed columns + JSONB, 5,010 trading days (20 years)
+- **Agents:** 10 archetypes with unique biases, spawning 1M swarm variants across 12 dimensions
+- **Consensus:** Regime-conditional impact weights (7 regimes: event, VIX spike, bull, bear, sideways, expiry, crisis)
+- **Scoring:** Automated prediction vs actual scoring with per-agent calibration
+- **Autoresearch:** Karpathy-style parameter optimization (1000 experiments in 70s, direction 42%→46.5%)
+- **LLM:** Sarvam 105B (free, India-built) or Claude Sonnet 4.6
 
 ## Data Sources
 
 | Source | Data | Method |
 |--------|------|--------|
 | NSE | Bhavcopy (EOD prices), FII/DII flows | REST API |
-| Zerodha/Kite | Index prices (Nifty, BankNifty, VIX) | MCP |
+| Zerodha/Kite | Index prices, F&O OI chain, PCR, max pain | MCP |
 | RBI | Reference rates (USDINR) | REST API |
-| Morningstar | Moat, P/E, P/B, fair value | MCP |
+| Morningstar | Moat, P/E, P/B, star rating, fair value | MCP |
 | Seeds | Holidays, constituents, sector map, expiry calendar | CSV |
+
+**20 years of data:** 5,010 trading days (Jan 2006 — Mar 2026). Nifty from 2,633 to 26,329.
 
 ## Why BharatTwin?
 
@@ -121,16 +128,23 @@ No global tool models these India-specific signals. BharatTwin does.
 
 ## Built With
 
-- Python 3.14 + Pydantic + SQLAlchemy
+- Python 3.14 + Pydantic + SQLAlchemy + FastAPI
 - PostgreSQL 16 (Alembic migrations)
-- Claude Sonnet 4.6 (agent LLM) / Claude Haiku (extraction)
+- [Sarvam 105B](https://www.sarvam.ai/models) (India-built, free API) / Claude Sonnet 4.6
 - Zerodha Kite MCP + Morningstar MCP
+- Autoresearch (Karpathy-style parameter optimization)
 
-## Status
+## Stats
 
-**Phase 0 (PoC): COMPLETE** — 4/4 direction accuracy, 0.65pp average error, 21 tests passing.
-
-Phase 1 (daily automated pipeline) in progress. See [Phase 1 Plan](docs/phase1_plan.md).
+| Metric | Value |
+|--------|-------|
+| Codebase | 9,429 LOC, 68 files, 24 commits |
+| Agents | 10 archetypes, 1M swarm variants |
+| Data | 5,010 trading days (20 years) |
+| Replay accuracy | 0.65pp avg error, 4/4 direction |
+| Autoresearch | 46.5% direction on 5,008 days |
+| LLM cost | ₹0 (Sarvam 105B free tier) |
+| Tests | 21 passing |
 
 ## License
 

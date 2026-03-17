@@ -15,7 +15,12 @@
 | Best agent | dealer_hedging (0.43pp avg) |
 | Worst agent | dii_mf / corp_earnings (1.32pp avg) |
 | Test coverage | 21 tests, all passing |
-| Codebase | 6,195 LOC, 51 files |
+| Codebase | 9,429 LOC, 68 files |
+| Swarm | 1M agents, 10 archetypes, 7 regime profiles |
+| Data | 5,010 trading days (20 years) |
+| LLM | Sarvam 105B live (free) |
+| Autoresearch | 42% → 46.5% direction (1000 experiments, 70s) |
+| F&O data | PCR, max pain, OI chain via Kite MCP |
 
 ## Phase 1 Goals
 
@@ -56,12 +61,12 @@
 
 ## Phase 1 Tasks
 
-### P1.1 — API Mode Activation
-- [ ] Set ANTHROPIC_API_KEY in env
-- [ ] Test API mode with single agent
-- [ ] Run full 8-agent pipeline via API
-- [ ] Compare API responses vs in-context responses quality
-- **Model:** claude-sonnet-4-6 (agents), claude-haiku-4-5 (extraction)
+### P1.1 — API Mode Activation ✅ DONE
+- [x] Sarvam 105B API key set (free tier, 60 RPM)
+- [x] Test API mode with single agent (dealer_hedging: SELL -1.80%, actual -2.29%)
+- [x] Multi-LLM provider: Sarvam / Claude / OpenAI-compatible
+- [x] JSON parsing fix for reasoning models (brace-depth matching)
+- **Model:** Sarvam 105B (free) or claude-sonnet-4-6
 
 ### P1.2 — Daily Scheduler
 - [ ] Cron job: `python -m src.pipeline <yesterday> --mode api` at 19:00 IST
@@ -69,11 +74,11 @@
 - [ ] Alert on pipeline failure (email/webhook)
 - [ ] Idempotent: re-running same date is safe (upsert)
 
-### P1.3 — Scoring Engine
-- [ ] After market close, compare consensus vs actual Nifty return
-- [ ] Store score in agent_decisions table
-- [ ] Track per-agent rolling accuracy
-- [ ] Adaptive conviction: multiply agent conviction by rolling accuracy factor
+### P1.3 — Scoring Engine ✅ DONE
+- [x] src/scoring.py — compare predictions to actuals
+- [x] Per-agent rolling accuracy tracking
+- [x] src/calibration.py — full agent calibration report
+- [x] src/autoresearch.py — Karpathy-style parameter optimization (1000 experiments, 70s)
 
 ### P1.4 — Historical Replay Expansion
 - [ ] 10 more event cases: demonetization 2016, budget 2020 (COVID), RBI cuts 2020,
@@ -82,11 +87,11 @@
 - [ ] 10 no-event days: random selection from different market regimes
 - [ ] Target: 24+ cases for statistical significance
 
-### P1.5 — Data Enrichment
-- [ ] Zerodha historical index prices via cron (auto-backfill)
-- [ ] Morningstar fundamentals refresh weekly
-- [ ] Derivatives data: Nifty OI, PCR, max pain (from Zerodha or NSE)
-- [ ] News/event ingestion: RSS feed or API for auto event detection
+### P1.5 — Data Enrichment ✅ MOSTLY DONE
+- [x] 20-year index backfill: 5,010 days (Jan 2006 — Mar 2026) via Zerodha
+- [x] Morningstar fundamentals: moat, P/E, P/B, fair value for Nifty heavyweights
+- [x] F&O derivatives: OI chain, PCR, max pain, ATM straddle via Kite MCP
+- [ ] News/event auto-ingestion: RSS feed or API (not yet built)
 
 ### P1.6 — Production Database
 - [ ] Migration from local Docker to managed Postgres (Supabase/Neon/RDS)
