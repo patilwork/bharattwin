@@ -60,31 +60,56 @@ def _mutate_params(params: dict, temperature: float = 0.1) -> dict:
     for key in mutate_keys:
         val = new_params[key]
         if isinstance(val, float):
-            # Gaussian mutation
             noise = random.gauss(0, abs(val) * temperature + 0.01)
             new_val = val + noise
 
-            # Clamp weights to [0, 1]
+            # Clamp by parameter type
             if key.startswith("w_"):
                 new_val = max(0.01, min(1.0, new_val))
-            # Clamp thresholds to reasonable ranges
-            elif "vix" in key:
-                new_val = max(5.0, min(40.0, new_val))
-            elif "mom" in key or "mean_revert" in key:
-                new_val = max(0.1, min(5.0, abs(new_val)))
+            elif key.startswith("dir_"):
+                # Direction thresholds: small range around 0
+                new_val = max(0.02, min(0.5, abs(new_val)))
+                if "sell" in key:
+                    new_val = -new_val
+            elif "vix" in key and "w_" not in key:
+                new_val = max(2.0, min(50.0, new_val))
+            elif "mom" in key and "w_" not in key:
+                new_val = max(0.1, min(10.0, abs(new_val)))
                 if "bear" in key:
                     new_val = -new_val
-            elif "vol" in key:
-                new_val = max(5.0, min(40.0, new_val))
+            elif "vol" in key and "w_" not in key:
+                new_val = max(2.0, min(40.0, new_val))
+            elif "scale" in key:
+                new_val = max(0.05, min(1.0, new_val))
+            elif "return" in key:
+                new_val = max(-2.0, min(2.0, new_val))
+            elif "breadth" in key and "w_" not in key:
+                new_val = max(10.0, min(90.0, new_val))
+            elif "bounce" in key or "reversal" in key or "threshold" in key:
+                new_val = max(0.5, min(8.0, abs(new_val)))
+            elif "penalty" in key:
+                new_val = max(0.1, min(1.0, new_val))
 
             new_params[key] = round(new_val, 4)
 
-    # Normalize signal weights to sum to 1
-    weight_keys = [k for k in new_params if k.startswith("w_")]
-    weight_sum = sum(new_params[k] for k in weight_keys)
-    if weight_sum > 0:
-        for k in weight_keys:
-            new_params[k] = round(new_params[k] / weight_sum, 4)
+    # Normalize the 5 core signal weights to sum to ~0.80
+    # (leaving ~0.20 for breadth, trend_20d, vix_change)
+    core_weight_keys = ["w_momentum", "w_mean_revert", "w_vix_regime", "w_trend", "w_volatility"]
+    core_sum = sum(new_params.get(k, 0) for k in core_weight_keys)
+    if core_sum > 0:
+        target = 0.80
+        for k in core_weight_keys:
+            if k in new_params:
+                new_params[k] = round(new_params[k] / core_sum * target, 4)
+
+    # Normalize the 3 auxiliary weights to sum to ~0.20
+    aux_weight_keys = ["w_breadth", "w_trend_20d", "w_vix_change"]
+    aux_sum = sum(new_params.get(k, 0) for k in aux_weight_keys)
+    if aux_sum > 0:
+        target = 0.20
+        for k in aux_weight_keys:
+            if k in new_params:
+                new_params[k] = round(new_params[k] / aux_sum * target, 4)
 
     return new_params
 
@@ -114,24 +139,39 @@ def run_autoresearch(
     n_experiments: int = 100,
     temperature: float = 0.15,
     cooling: bool = True,
+    train_pct: float = 0.70,
 ) -> dict:
     """
-    Run the autoresearch optimization loop.
+    Run the autoresearch optimization loop with train/test split.
+
+    Optimizes on train set (first 70% of days by default),
+    validates on test set (last 30%) to detect overfitting.
 
     Args:
         n_experiments: Number of experiments to run.
         temperature: Initial mutation magnitude (0.05-0.3).
         cooling: If True, reduce temperature over time (simulated annealing).
+        train_pct: Fraction of data for training (default 0.70).
 
     Returns:
         Best parameters found and their score.
     """
     global BEST_PARAMS, BEST_SCORE
 
-    # Establish baseline
+    # Establish baseline on full dataset
     print("Establishing baseline...")
-    baseline_results = run_full_backtest(PARAMS)
-    baseline_scores = score_results(baseline_results)
+    all_results = run_full_backtest(PARAMS)
+
+    # Train/test split (temporal — no leakage)
+    split_idx = int(len(all_results) * train_pct)
+    train_results = all_results[:split_idx]
+    test_results = all_results[split_idx:]
+    print(f"Split: {len(train_results)} train / {len(test_results)} test "
+          f"({train_results[0].date}–{train_results[-1].date} | "
+          f"{test_results[0].date}–{test_results[-1].date})")
+
+    baseline_scores = score_results(train_results)
+    baseline_test_scores = score_results(test_results)
     baseline_composite = _composite_score(baseline_scores)
 
     BEST_PARAMS = copy.deepcopy(PARAMS)
@@ -154,9 +194,10 @@ def run_autoresearch(
         # Mutate
         candidate = _mutate_params(BEST_PARAMS, temperature=t)
 
-        # Evaluate
-        results = run_full_backtest(candidate)
-        scores = score_results(results)
+        # Evaluate on TRAIN set only (prevents overfitting)
+        all_res = run_full_backtest(candidate)
+        train_res = all_res[:split_idx]
+        scores = score_results(train_res)
         composite = _composite_score(scores)
 
         # Compare
@@ -192,30 +233,48 @@ def run_autoresearch(
     elapsed = time.time() - t0
     rate = n_experiments / elapsed
 
-    # Final best
-    best_results = run_full_backtest(BEST_PARAMS)
-    best_scores = score_results(best_results)
+    # Final evaluation on BOTH train and test
+    best_all = run_full_backtest(BEST_PARAMS)
+    best_train = best_all[:split_idx]
+    best_test = best_all[split_idx:]
+    best_train_scores = score_results(best_train)
+    best_test_scores = score_results(best_test)
 
-    print(f"\n{'=' * 65}")
+    print(f"\n{'=' * 70}")
     print(f"AUTORESEARCH COMPLETE — {n_experiments} experiments in {elapsed:.0f}s ({rate:.1f}/s)")
-    print(f"{'=' * 65}")
+    print(f"{'=' * 70}")
     print(f"  Improvements: {improvements}")
-    print(f"  Baseline:  dir={baseline_scores['direction_pct']}% err={baseline_scores['avg_error_pp']}pp")
-    print(f"  Best:      dir={best_scores['direction_pct']}% err={best_scores['avg_error_pp']}pp")
-    print(f"  Composite: {baseline_composite:.2f} → {BEST_SCORE:.2f} "
+    print(f"")
+    print(f"  TRAIN ({len(best_train)} days: {best_train[0].date}–{best_train[-1].date}):")
+    print(f"    Baseline: dir={baseline_scores['direction_pct']}% err={baseline_scores['avg_error_pp']}pp")
+    print(f"    Best:     dir={best_train_scores['direction_pct']}% err={best_train_scores['avg_error_pp']}pp")
+    print(f"    Composite: {baseline_composite:.2f} → {BEST_SCORE:.2f} "
           f"({'+' if BEST_SCORE > baseline_composite else ''}{BEST_SCORE - baseline_composite:.2f})")
+    print(f"")
+    print(f"  TEST ({len(best_test)} days: {best_test[0].date}–{best_test[-1].date}):")
+    print(f"    Baseline: dir={baseline_test_scores['direction_pct']}% err={baseline_test_scores['avg_error_pp']}pp")
+    print(f"    Best:     dir={best_test_scores['direction_pct']}% err={best_test_scores['avg_error_pp']}pp")
+
+    # Overfit check
+    train_gain = best_train_scores['direction_pct'] - baseline_scores['direction_pct']
+    test_gain = best_test_scores['direction_pct'] - baseline_test_scores['direction_pct']
+    if test_gain < 0 and train_gain > 1:
+        print(f"    ⚠️  OVERFIT WARNING: train +{train_gain:.1f}pp but test {test_gain:+.1f}pp")
+    elif test_gain >= 0:
+        print(f"    ✅ Generalizes: train +{train_gain:.1f}pp, test +{test_gain:.1f}pp")
 
     print(f"\n  Optimized parameters:")
     for k, v in sorted(BEST_PARAMS.items()):
         orig = PARAMS.get(k)
         changed = " ← CHANGED" if orig != v else ""
-        print(f"    {k:<25} {v:>8.4f}  (was {orig}){changed}")
+        print(f"    {k:<30} {v:>8.4f}  (was {orig}){changed}")
 
-    print(f"{'=' * 65}")
+    print(f"{'=' * 70}")
 
     return {
         "best_params": BEST_PARAMS,
-        "best_scores": best_scores,
+        "best_train_scores": best_train_scores,
+        "best_test_scores": best_test_scores,
         "baseline_scores": baseline_scores,
         "improvements": improvements,
         "experiments": n_experiments,

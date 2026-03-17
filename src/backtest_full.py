@@ -49,29 +49,60 @@ class DayResult:
 # the thresholds and weights below.
 
 # Optimizable parameters (this is what autoresearch modifies)
+# v2: expanded from 13 to 35 parameters
 PARAMS = {
-    # Momentum thresholds
-    "mom_1d_bull": 0.8,       # 1d return > this = bullish signal
-    "mom_1d_bear": -0.8,      # 1d return < this = bearish signal
-    "mom_5d_bull": 1.5,       # 5d momentum > this = trend up
+    # ── Momentum thresholds ──
+    "mom_1d_bull": 0.8,
+    "mom_1d_bear": -0.8,
+    "mom_5d_bull": 1.5,
     "mom_5d_bear": -1.5,
+    "mom_20d_bull": 5.0,        # NEW: 20d trend confirmation
+    "mom_20d_bear": -5.0,
 
-    # VIX regime
-    "vix_fear": 20.0,         # VIX above this = elevated fear
-    "vix_complacency": 13.0,  # VIX below this = complacent
+    # ── VIX regime thresholds ──
+    "vix_fear": 20.0,
+    "vix_complacency": 13.0,
+    "vix_crisis": 30.0,         # NEW: panic threshold
+    "vix_spike_1d": 3.0,        # NEW: 1-day VIX jump = fear signal
 
-    # Volatility
-    "vol_high": 20.0,         # 20d vol above this = high vol regime
+    # ── Volatility ──
+    "vol_high": 20.0,
+    "vol_penalty": 0.5,         # NEW: reduce return estimate in high-vol
 
-    # Mean reversion strength
-    "mean_revert_threshold": 2.0,  # If 1d move > this, expect partial reversion
+    # ── Mean reversion ──
+    "mean_revert_threshold": 2.0,
+    "mean_revert_scale": 0.3,   # NEW: tunable (was hardcoded 0.3)
+    "oversold_bounce": 3.0,     # NEW: if 1d drop > this, expect bounce
+    "overbought_reversal": 3.0, # NEW: if 1d rally > this, expect fade
 
-    # Signal weights (what autoresearch optimizes most)
-    "w_momentum": 0.30,
-    "w_mean_revert": 0.25,
-    "w_vix_regime": 0.20,
+    # ── Magnitude scales (were hardcoded) ──
+    "momentum_return_scale": 0.3,  # NEW: mom_1d * this
+    "trend_return_scale": 0.1,     # NEW: mom_5d * this
+    "vix_bearish_return": -0.3,    # NEW: return when VIX > fear
+    "vix_bullish_return": 0.2,     # NEW: return when VIX < complacency
+
+    # ── Direction thresholds ──
+    "dir_buy_threshold": 0.15,     # NEW: dir_score > this = BUY
+    "dir_sell_threshold": -0.15,   # NEW: dir_score < this = SELL
+
+    # ── Breadth signal ──
+    "w_breadth": 0.10,            # NEW: breadth signal weight
+    "breadth_bull": 60.0,         # NEW: breadth_pct_up > this = bullish
+    "breadth_bear": 35.0,         # NEW: breadth_pct_up < this = bearish
+
+    # ── 20d trend signal ──
+    "w_trend_20d": 0.08,          # NEW: 20d trend weight
+
+    # ── VIX change signal ──
+    "w_vix_change": 0.07,         # NEW: 1-day VIX change weight
+
+    # ── Signal weights ──
+    "w_momentum": 0.25,
+    "w_mean_revert": 0.20,
+    "w_vix_regime": 0.15,
     "w_trend": 0.15,
-    "w_volatility": 0.10,
+    "w_volatility": 0.05,
+    # Note: w_breadth, w_trend_20d, w_vix_change are separate above
 }
 
 
@@ -80,37 +111,52 @@ def _compute_signal(
     mom_5d: float | None,
     mom_20d: float | None,
     vix: float | None,
+    vix_prev: float | None,
     vol_20d: float | None,
+    breadth_pct_up: float | None,
     params: dict = PARAMS,
 ) -> tuple[str, float]:
     """
-    Compute a directional signal from factors.
+    Compute a directional signal from factors. v2 with 8 signal types.
 
     Returns (direction, expected_return_pct).
     """
     signals = {}
+    mom_scale = params.get("momentum_return_scale", 0.3)
+    trend_scale = params.get("trend_return_scale", 0.1)
+    mr_scale = params.get("mean_revert_scale", 0.3)
 
-    # 1. Momentum signal: follow the trend
+    # 1. Momentum: follow 1d move
     if mom_1d > params["mom_1d_bull"]:
-        signals["momentum"] = ("BUY", min(mom_1d * 0.3, 1.5))
+        signals["momentum"] = ("BUY", min(mom_1d * mom_scale, 1.5))
     elif mom_1d < params["mom_1d_bear"]:
-        signals["momentum"] = ("SELL", max(mom_1d * 0.3, -1.5))
+        signals["momentum"] = ("SELL", max(mom_1d * mom_scale, -1.5))
     else:
         signals["momentum"] = ("HOLD", 0.0)
 
-    # 2. Mean reversion: large moves tend to partially revert
+    # 2. Mean reversion: large 1d moves partially revert
     if abs(mom_1d) > params["mean_revert_threshold"]:
-        revert_mag = -mom_1d * 0.3  # Expect 30% reversion
+        revert_mag = -mom_1d * mr_scale
         signals["mean_revert"] = ("BUY" if revert_mag > 0 else "SELL", revert_mag)
+    elif mom_1d < -params.get("oversold_bounce", 3.0):
+        # Oversold bounce: extra-large drops tend to bounce
+        signals["mean_revert"] = ("BUY", abs(mom_1d) * mr_scale * 0.5)
+    elif mom_1d > params.get("overbought_reversal", 3.0):
+        # Overbought fade
+        signals["mean_revert"] = ("SELL", -mom_1d * mr_scale * 0.5)
     else:
         signals["mean_revert"] = ("HOLD", 0.0)
 
     # 3. VIX regime
+    vix_bear_ret = params.get("vix_bearish_return", -0.3)
+    vix_bull_ret = params.get("vix_bullish_return", 0.2)
     if vix is not None:
-        if vix > params["vix_fear"]:
-            signals["vix"] = ("SELL", -0.3)  # Fear = bearish
+        if vix > params.get("vix_crisis", 30.0):
+            signals["vix"] = ("SELL", vix_bear_ret * 2.0)  # Crisis = extra bearish
+        elif vix > params["vix_fear"]:
+            signals["vix"] = ("SELL", vix_bear_ret)
         elif vix < params["vix_complacency"]:
-            signals["vix"] = ("BUY", 0.2)   # Complacency = mildly bullish
+            signals["vix"] = ("BUY", vix_bull_ret)
         else:
             signals["vix"] = ("HOLD", 0.0)
     else:
@@ -119,42 +165,89 @@ def _compute_signal(
     # 4. Trend (5d momentum)
     if mom_5d is not None:
         if mom_5d > params["mom_5d_bull"]:
-            signals["trend"] = ("BUY", mom_5d * 0.1)
+            signals["trend"] = ("BUY", mom_5d * trend_scale)
         elif mom_5d < params["mom_5d_bear"]:
-            signals["trend"] = ("SELL", mom_5d * 0.1)
+            signals["trend"] = ("SELL", mom_5d * trend_scale)
         else:
             signals["trend"] = ("HOLD", 0.0)
     else:
         signals["trend"] = ("HOLD", 0.0)
 
-    # 5. Volatility: high vol = reduce conviction, widen range
+    # 5. Volatility: high vol penalizes return estimate
+    vol_pen = params.get("vol_penalty", 0.5)
     if vol_20d is not None and vol_20d > params["vol_high"]:
-        signals["volatility"] = ("HOLD", 0.0)  # High vol = uncertain
+        signals["volatility"] = ("HOLD", 0.0)
     else:
         signals["volatility"] = ("HOLD", 0.0)
 
-    # Weighted combination
-    dir_score = 0.0
-    return_est = 0.0
+    # 6. NEW: Breadth signal
+    if breadth_pct_up is not None:
+        if breadth_pct_up > params.get("breadth_bull", 60.0):
+            signals["breadth"] = ("BUY", 0.2)
+        elif breadth_pct_up < params.get("breadth_bear", 35.0):
+            signals["breadth"] = ("SELL", -0.2)
+        else:
+            signals["breadth"] = ("HOLD", 0.0)
+    else:
+        signals["breadth"] = ("HOLD", 0.0)
+
+    # 7. NEW: 20d trend signal
+    if mom_20d is not None:
+        if mom_20d > params.get("mom_20d_bull", 5.0):
+            signals["trend_20d"] = ("BUY", mom_20d * 0.02)
+        elif mom_20d < params.get("mom_20d_bear", -5.0):
+            signals["trend_20d"] = ("SELL", mom_20d * 0.02)
+        else:
+            signals["trend_20d"] = ("HOLD", 0.0)
+    else:
+        signals["trend_20d"] = ("HOLD", 0.0)
+
+    # 8. NEW: VIX 1-day change signal
+    if vix is not None and vix_prev is not None and vix_prev > 0:
+        vix_change = vix - vix_prev
+        spike_thresh = params.get("vix_spike_1d", 3.0)
+        if vix_change > spike_thresh:
+            signals["vix_change"] = ("SELL", -0.3)  # VIX spiking = fear incoming
+        elif vix_change < -spike_thresh:
+            signals["vix_change"] = ("BUY", 0.2)   # VIX collapsing = relief rally
+        else:
+            signals["vix_change"] = ("HOLD", 0.0)
+    else:
+        signals["vix_change"] = ("HOLD", 0.0)
+
+    # ── Weighted combination ──
     weights = {
         "momentum": params["w_momentum"],
         "mean_revert": params["w_mean_revert"],
         "vix": params["w_vix_regime"],
         "trend": params["w_trend"],
         "volatility": params["w_volatility"],
+        "breadth": params.get("w_breadth", 0.10),
+        "trend_20d": params.get("w_trend_20d", 0.08),
+        "vix_change": params.get("w_vix_change", 0.07),
     }
 
+    dir_score = 0.0
+    return_est = 0.0
     for sig_name, (direction, ret) in signals.items():
-        w = weights.get(sig_name, 0.1)
+        w = weights.get(sig_name, 0.05)
         if direction == "BUY":
             dir_score += w
         elif direction == "SELL":
             dir_score -= w
         return_est += ret * w
 
-    if dir_score > 0.15:
+    # High-vol penalty on return magnitude
+    if vol_20d is not None and vol_20d > params["vol_high"]:
+        return_est *= vol_pen
+
+    # Tunable direction thresholds
+    buy_thresh = params.get("dir_buy_threshold", 0.15)
+    sell_thresh = params.get("dir_sell_threshold", -0.15)
+
+    if dir_score > buy_thresh:
         final_dir = "BUY"
-    elif dir_score < -0.15:
+    elif dir_score < sell_thresh:
         final_dir = "SELL"
     else:
         final_dir = "HOLD"
@@ -234,8 +327,22 @@ def run_full_backtest(params: dict | None = None) -> list[DayResult]:
         else:
             vol_20d = None
 
-        # Predict
-        pred_dir, pred_ret = _compute_signal(mom_1d, mom_5d, mom_20d, vix, vol_20d, params)
+        # Previous day VIX (for VIX change signal)
+        vix_prev = closes[i - 1][3] if i >= 1 else None
+
+        # Breadth proxy: % of last 5 days that were positive
+        # (real breadth needs bhavcopy; this is an index-level proxy)
+        if i >= 5:
+            up_days = sum(1 for j in range(i - 4, i + 1)
+                          if closes[j][1] > closes[j - 1][1])
+            breadth_pct_up = up_days / 5 * 100
+        else:
+            breadth_pct_up = None
+
+        # Predict (v2: passes all new features)
+        pred_dir, pred_ret = _compute_signal(
+            mom_1d, mom_5d, mom_20d, vix, vix_prev, vol_20d, breadth_pct_up, params
+        )
 
         # Score
         actual_dir = "BUY" if actual_return > 0.25 else ("SELL" if actual_return < -0.25 else "HOLD")
