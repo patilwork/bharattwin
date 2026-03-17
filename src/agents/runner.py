@@ -63,7 +63,11 @@ def run_all(
         agent = BaseAgent(persona)
         logger.info("Running agent: %s (%s) mode=%s", persona.agent_id, persona.role, mode)
 
-        result = agent.run(market_state, event, mode=mode)
+        try:
+            result = agent.run(market_state, event, mode=mode)
+        except (ValueError, RuntimeError) as e:
+            logger.error("Agent %s failed: %s — skipping", persona.agent_id, e)
+            continue
 
         if isinstance(result, AgentDecision):
             results.append(result)
