@@ -28,7 +28,7 @@ import json
 import math
 import random
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
@@ -64,19 +64,216 @@ VOLUME_WEIGHT = {
 }
 
 IMPACT_WEIGHT = {
-    # Price impact multiplier — how much each vote moves the consensus
-    # Institutional money moves prices more per rupee than retail
-    "fii_quant":         3.0,    # FII block orders move Nifty 20-50 points
-    "retail_momentum":   0.5,    # Dispersed, small orders, low per-capita impact
-    "dealer_hedging":    2.5,    # Gamma hedging amplifies moves mechanically
-    "dii_mf":            2.0,    # Large SIP deployments, insurance buys
-    "macro":             1.5,    # Influences institutional positioning via reports
-    "sector_rotation":   1.0,    # PMS rebalancing, moderate block sizes
-    "corp_earnings":     1.0,    # Influences buy-side via research
-    "event_news":        1.5,    # Fast money, concentrated bets
-    "operator":          0.3,    # Operators mostly move small-caps, low Nifty impact
-    "dabba_speculator":  0.2,    # Dabba doesn't hit exchange order book directly
+    # DEFAULT price impact multiplier (used when no regime is detected)
+    "fii_quant":         3.0,
+    "retail_momentum":   0.5,
+    "dealer_hedging":    2.5,
+    "dii_mf":            2.0,
+    "macro":             1.5,
+    "sector_rotation":   1.0,
+    "corp_earnings":     1.0,
+    "event_news":        1.5,
+    "operator":          0.3,
+    "dabba_speculator":  0.2,
 }
+
+# ─── Regime-Conditional Impact Weights ───────────────────────────────────────
+#
+# Different market participants dominate in different conditions.
+# The regime is detected from the market state BEFORE agents are called,
+# then the appropriate weight profile is applied to the swarm consensus.
+#
+# Each regime multiplies the base IMPACT_WEIGHT by its modifier.
+# Modifier > 1.0 = this agent matters MORE in this regime.
+# Modifier < 1.0 = this agent matters LESS.
+
+REGIME_IMPACT_MODIFIERS = {
+    # ── EVENT DAY: policy announcement, election, surprise ──
+    # Event traders and macro analysts dominate. Operators are noise.
+    "event": {
+        "fii_quant":         1.5,   # FIIs react fast to macro events
+        "retail_momentum":   0.3,   # Retail is slow to react, just panics
+        "dealer_hedging":    2.0,   # Gamma squeeze amplifies event moves
+        "dii_mf":            0.5,   # DIIs react slowly (investment committee meets weekly)
+        "macro":             2.5,   # Macro analyst is THE voice on policy events
+        "sector_rotation":   1.5,   # Rotation map activates immediately
+        "corp_earnings":     0.3,   # Earnings don't change on event day
+        "event_news":        3.0,   # This is their moment — maximum relevance
+        "operator":          0.1,   # Operators are irrelevant for Nifty events
+        "dabba_speculator":  0.1,   # Dabba follows, doesn't lead on events
+    },
+
+    # ── VIX SPIKE (VIX > 22): fear regime, hedging-driven ──
+    # Dealers and FIIs dominate via gamma hedging and block selling.
+    "vix_spike": {
+        "fii_quant":         2.0,   # FII risk-off selling accelerates
+        "retail_momentum":   0.5,   # Retail panics but in dispersed, delayed way
+        "dealer_hedging":    3.0,   # Dealer gamma hedging IS the market in high-VIX
+        "dii_mf":            1.5,   # DII "buy the dip" is the counterforce
+        "macro":             1.0,
+        "sector_rotation":   0.5,   # Correlation goes to 1, sectors don't matter
+        "corp_earnings":     0.3,   # Fundamentals irrelevant in panic
+        "event_news":        1.5,   # Fast money trades the vol
+        "operator":          0.1,   # Operators hide during VIX spikes
+        "dabba_speculator":  0.3,   # Dabba gets margin-called, amplifies panic
+    },
+
+    # ── TRENDING BULL (mom_20d > 5%): momentum regime ──
+    # Retail FOMO and DII SIPs dominate. Operators pump mid-caps.
+    "bull_trend": {
+        "fii_quant":         1.0,
+        "retail_momentum":   2.0,   # Retail FOMO drives marginal buying
+        "dealer_hedging":    0.8,   # Vol is low, dealers are less relevant
+        "dii_mf":            1.5,   # SIP flows are steady, building floor
+        "macro":             0.5,   # "Macro doesn't support it" but market goes up anyway
+        "sector_rotation":   1.5,   # Rotation signals work well in bull markets
+        "corp_earnings":     1.5,   # Earnings justify the rally (or don't)
+        "event_news":        0.5,   # No crisis = event trader is bored
+        "operator":          1.5,   # Operators pump actively in bull markets
+        "dabba_speculator":  1.5,   # Dabba traders are max bullish, max leveraged
+    },
+
+    # ── TRENDING BEAR (mom_20d < -5%): risk-off regime ──
+    # FII selling and dealer hedging dominate. DII provides floor.
+    "bear_trend": {
+        "fii_quant":         2.5,   # FII selling is THE driver in bear markets
+        "retail_momentum":   0.8,   # Retail sells late but capitulation is real
+        "dealer_hedging":    2.0,   # Gamma hedging amplifies downside
+        "dii_mf":            2.0,   # DII "buying the dip" creates temporary floors
+        "macro":             1.5,   # Macro narrative justifies the selloff
+        "sector_rotation":   0.5,   # Everything falls together
+        "corp_earnings":     1.0,   # Earnings downgrades confirm the trend
+        "event_news":        1.0,
+        "operator":          0.2,   # Operators can't pump in a bear market
+        "dabba_speculator":  0.5,   # Dabba gets wiped out, stops trading
+    },
+
+    # ── SIDEWAYS / LOW VOL (VIX < 14): range-bound ──
+    # Fundamentals and rotation matter most. Momentum traders are lost.
+    "sideways": {
+        "fii_quant":         1.0,
+        "retail_momentum":   0.5,   # No momentum = momentum trader is useless
+        "dealer_hedging":    0.5,   # Low vol = dealers aren't driving anything
+        "dii_mf":            1.5,   # Steady SIP accumulation, the quiet bid
+        "macro":             1.0,
+        "sector_rotation":   2.0,   # Rotation WITHIN the range is the only game
+        "corp_earnings":     2.0,   # Stock-picking matters when the index is flat
+        "event_news":        0.3,   # No event, no edge
+        "operator":          1.0,   # Operators work best in sideways (small-cap pumps)
+        "dabba_speculator":  0.5,   # Bored, reduced activity
+    },
+
+    # ── EXPIRY DAY: weekly/monthly options expiry ──
+    # Dealer gamma hedging and retail F&O positioning dominate.
+    "expiry": {
+        "fii_quant":         0.8,
+        "retail_momentum":   1.5,   # Retail option buyers create gamma
+        "dealer_hedging":    3.0,   # Max pain, gamma pin — dealers own this day
+        "dii_mf":            0.5,   # DIIs don't care about weekly expiry
+        "macro":             0.3,   # Macro irrelevant for intraday expiry dynamics
+        "sector_rotation":   0.5,
+        "corp_earnings":     0.3,
+        "event_news":        0.5,
+        "operator":          0.5,
+        "dabba_speculator":  2.0,   # Dabba traders max active on expiry (satta!)
+    },
+
+    # ── CRISIS (VIX > 30): tail risk, circuit breaker territory ──
+    # Only institutional flows matter. Shadow market goes dark.
+    "crisis": {
+        "fii_quant":         3.0,   # FII block selling moves everything
+        "retail_momentum":   0.3,   # Retail is frozen or capitulating
+        "dealer_hedging":    2.5,   # Gamma cascade is mechanical
+        "dii_mf":            2.0,   # DII is the only buyer in a crisis
+        "macro":             2.0,   # Policy response is the key signal
+        "sector_rotation":   0.2,   # Correlation = 1, no rotation possible
+        "corp_earnings":     0.2,   # Fundamentals are meaningless in panic
+        "event_news":        2.0,   # The crisis IS the event
+        "operator":          0.0,   # Operators go dark in a crisis
+        "dabba_speculator":  0.0,   # Dabba shuts down, margin calls everywhere
+    },
+}
+
+
+def detect_regime(market_state: dict | None = None, event: dict | None = None) -> str:
+    """
+    Detect the current market regime from the market state.
+
+    Args:
+        market_state: The T-1 market state dict.
+        event: Optional event dict (if present, regime is "event").
+
+    Returns:
+        Regime string: "event", "vix_spike", "bull_trend", "bear_trend",
+                       "sideways", "expiry", "crisis", or "default".
+    """
+    # Event takes highest priority
+    if event and event.get("headline"):
+        return "event"
+
+    if market_state is None:
+        return "default"
+
+    import json
+
+    # Extract signals
+    vix = market_state.get("india_vix")
+    if vix is not None:
+        vix = float(vix)
+
+    # Factor map
+    fm = market_state.get("factor_map")
+    if fm and isinstance(fm, str):
+        fm = json.loads(fm)
+    elif fm is None:
+        fm = {}
+
+    mom_20d = fm.get("momentum_20d")
+
+    # Regime state (expiry flags)
+    rs = market_state.get("regime_state")
+    if rs and isinstance(rs, str):
+        rs = json.loads(rs)
+    elif rs is None:
+        rs = {}
+
+    is_expiry = (
+        rs.get("is_nifty_weekly_expiry", False) or
+        rs.get("is_nifty_monthly_expiry", False) or
+        rs.get("is_banknifty_weekly_expiry", False)
+    )
+
+    # Priority order: crisis > vix_spike > expiry > bear > bull > sideways
+    if vix is not None and vix > 30:
+        return "crisis"
+    if vix is not None and vix > 22:
+        return "vix_spike"
+    if is_expiry:
+        return "expiry"
+    if mom_20d is not None and mom_20d < -5:
+        return "bear_trend"
+    if mom_20d is not None and mom_20d > 5:
+        return "bull_trend"
+    if vix is not None and vix < 14:
+        return "sideways"
+
+    return "default"
+
+
+def get_regime_impact_weights(regime: str) -> dict[str, float]:
+    """
+    Get the final impact weights for a given regime.
+
+    Multiplies the base IMPACT_WEIGHT by the regime-specific modifier.
+    """
+    modifiers = REGIME_IMPACT_MODIFIERS.get(regime, {})
+    if not modifiers:
+        return IMPACT_WEIGHT.copy()
+
+    return {
+        arch: IMPACT_WEIGHT.get(arch, 1.0) * modifiers.get(arch, 1.0)
+        for arch in set(list(IMPACT_WEIGHT.keys()) + list(modifiers.keys()))
+    }
 
 
 @dataclass
@@ -106,7 +303,8 @@ class SwarmConsensus:
     range_high: float
     consensus_direction: Direction
     conviction_score: float  # 0-100 based on voting margin
-    votes: list[SwarmVote]
+    regime: str = "default"
+    votes: list[SwarmVote] = field(default_factory=list)
 
 
 def _noise_for_variant(agent: SwarmAgent, archetype_base: float, archetype_conv: int) -> tuple[float, int, str]:
@@ -216,6 +414,8 @@ def amplify_to_swarm(
     total_agents: int = 1_000_000,
     use_volume_weights: bool = True,
     use_impact_weights: bool = True,
+    market_state: dict | None = None,
+    event: dict | None = None,
 ) -> SwarmConsensus:
     """
     Take archetype decisions and amplify to a volume-weighted swarm.
@@ -267,23 +467,27 @@ def amplify_to_swarm(
             conviction=adj_conv,
         ))
 
-    # --- Aggregate with impact weighting ---
+    # --- Aggregate with regime-conditional impact weighting ---
     n = len(votes)
+
+    # Detect regime and get dynamic weights
+    regime = detect_regime(market_state, event) if (market_state or event) else "default"
+    active_weights = get_regime_impact_weights(regime) if use_impact_weights else IMPACT_WEIGHT
 
     if use_impact_weights:
         # Impact-weighted mean return
         weighted_sum = 0.0
         total_impact = 0.0
         for v in votes:
-            w = IMPACT_WEIGHT.get(v.archetype, 1.0)
+            w = active_weights.get(v.archetype, 1.0)
             weighted_sum += v.base_pct * w
             total_impact += w
         mean_ret = weighted_sum / total_impact if total_impact else 0
 
         # Impact-weighted direction vote
-        buy_impact = sum(IMPACT_WEIGHT.get(v.archetype, 1.0) for v in votes if v.direction == Direction.BUY)
-        sell_impact = sum(IMPACT_WEIGHT.get(v.archetype, 1.0) for v in votes if v.direction == Direction.SELL)
-        hold_impact = sum(IMPACT_WEIGHT.get(v.archetype, 1.0) for v in votes if v.direction == Direction.HOLD)
+        buy_impact = sum(active_weights.get(v.archetype, 1.0) for v in votes if v.direction == Direction.BUY)
+        sell_impact = sum(active_weights.get(v.archetype, 1.0) for v in votes if v.direction == Direction.SELL)
+        hold_impact = sum(active_weights.get(v.archetype, 1.0) for v in votes if v.direction == Direction.HOLD)
     else:
         mean_ret = sum(v.base_pct for v in votes) / n if n else 0
         buy_impact = sell_impact = hold_impact = 0  # Not used
@@ -339,6 +543,7 @@ def amplify_to_swarm(
         range_high=round(range_high, 4),
         consensus_direction=consensus_dir,
         conviction_score=conviction_score,
+        regime=regime if (market_state or event) else "default",
         votes=votes,
     )
 
@@ -353,7 +558,9 @@ def print_swarm_result(result: SwarmConsensus, title: str = "") -> None:
     else:
         print("SWARM CONSENSUS")
     print(f"{'=' * 70}")
-    print(f"  Agents: {result.total_agents}")
+    regime_emoji = {"event": "⚡", "vix_spike": "🔥", "bull_trend": "📈", "bear_trend": "📉",
+                     "sideways": "➡️", "expiry": "🎯", "crisis": "🚨", "default": "⚙️"}
+    print(f"  Agents: {result.total_agents:,} | Regime: {regime_emoji.get(result.regime, '')} {result.regime}")
     print(f"  Direction: {dir_emoji.get(result.consensus_direction.value, '')} {result.consensus_direction.value} "
           f"(conviction: {result.conviction_score:.0f}%)")
     print(f"  Mean return:   {result.mean_return_pct:+.2f}%")
