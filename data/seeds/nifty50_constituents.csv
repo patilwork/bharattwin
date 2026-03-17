@@ -1,0 +1,51 @@
+symbol,company_name,sector,isin,index_weight_pct
+RELIANCE,Reliance Industries Ltd,Energy,INE002A01018,10.40
+HDFCBANK,HDFC Bank Ltd,Financials,INE040A01034,12.30
+ICICIBANK,ICICI Bank Ltd,Financials,INE090A01021,7.80
+INFY,Infosys Ltd,Information Technology,INE009A01021,6.10
+TCS,Tata Consultancy Services Ltd,Information Technology,INE467B01029,4.80
+BHARTIARTL,Bharti Airtel Ltd,Communication Services,INE397D01024,3.50
+ITC,ITC Ltd,Consumer Staples,INE154A01025,4.20
+KOTAKBANK,Kotak Mahindra Bank Ltd,Financials,INE237A01028,3.10
+LT,Larsen and Toubro Ltd,Industrials,INE018A01030,3.80
+HINDUNILVR,Hindustan Unilever Ltd,Consumer Staples,INE030A01027,2.90
+SBIN,State Bank of India,Financials,INE062A01020,3.40
+AXISBANK,Axis Bank Ltd,Financials,INE238A01034,2.70
+BAJFINANCE,Bajaj Finance Ltd,Financials,INE296A01024,2.50
+WIPRO,Wipro Ltd,Information Technology,INE075A01022,1.60
+HCLTECH,HCL Technologies Ltd,Information Technology,INE860A01027,2.20
+MARUTI,Maruti Suzuki India Ltd,Consumer Discretionary,INE585B01010,1.80
+TITAN,Titan Company Ltd,Consumer Discretionary,INE280A01028,1.70
+SUNPHARMA,Sun Pharmaceutical Industries Ltd,Healthcare,INE044A01036,1.90
+ADANIENT,Adani Enterprises Ltd,Industrials,INE423A01024,1.50
+ADANIPORTS,Adani Ports and SEZ Ltd,Industrials,INE742F01042,1.30
+ULTRACEMCO,UltraTech Cement Ltd,Materials,INE481G01011,1.40
+POWERGRID,Power Grid Corporation Ltd,Utilities,INE752E01010,1.10
+NTPC,NTPC Ltd,Utilities,INE733E01010,1.20
+ONGC,Oil and Natural Gas Corporation Ltd,Energy,INE213A01029,1.30
+TATAMOTORS,Tata Motors Ltd,Consumer Discretionary,INE155A01022,1.40
+JSWSTEEL,JSW Steel Ltd,Materials,INE019A01038,1.20
+TATASTEEL,Tata Steel Ltd,Materials,INE081A01020,1.10
+DRREDDY,Dr. Reddys Laboratories Ltd,Healthcare,INE089A01023,1.00
+CIPLA,Cipla Ltd,Healthcare,INE059A01026,0.90
+BPCL,Bharat Petroleum Corporation Ltd,Energy,INE029A01011,0.80
+COALINDIA,Coal India Ltd,Energy,INE522F01014,1.10
+GRASIM,Grasim Industries Ltd,Materials,INE047A01021,1.00
+HEROMOTOCO,Hero MotoCorp Ltd,Consumer Discretionary,INE158A01026,0.80
+EICHERMOT,Eicher Motors Ltd,Consumer Discretionary,INE066A01021,0.70
+INDUSINDBK,IndusInd Bank Ltd,Financials,INE095A01012,0.80
+BAJAJFINSV,Bajaj Finserv Ltd,Financials,INE918I01026,0.90
+HINDALCO,Hindalco Industries Ltd,Materials,INE038A01020,0.80
+TATACONSUM,Tata Consumer Products Ltd,Consumer Staples,INE192A01025,0.70
+NESTLEIND,Nestle India Ltd,Consumer Staples,INE239A01016,0.80
+BRITANNIA,Britannia Industries Ltd,Consumer Staples,INE216A01030,0.60
+APOLLOHOSP,Apollo Hospitals Enterprise Ltd,Healthcare,INE437A01024,0.70
+DIVISLAB,Divis Laboratories Ltd,Healthcare,INE361B01024,0.70
+BAJAJ-AUTO,Bajaj Auto Ltd,Consumer Discretionary,INE917I01010,0.80
+TECHM,Tech Mahindra Ltd,Information Technology,INE669C01036,0.90
+ASIANPAINT,Asian Paints Ltd,Materials,INE021A01026,1.20
+M&M,Mahindra and Mahindra Ltd,Consumer Discretionary,INE101A01026,1.10
+HDFCLIFE,HDFC Life Insurance Company Ltd,Financials,INE795G01014,0.70
+SBILIFE,SBI Life Insurance Company Ltd,Financials,INE123W01016,0.80
+SHRIRAMFIN,Shriram Finance Ltd,Financials,INE721A01013,0.60
+BEL,Bharat Electronics Ltd,Industrials,INE263A01024,0.70

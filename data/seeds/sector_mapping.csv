@@ -1,0 +1,20 @@
+sector_code,sector_name,nse_sector,is_rate_sensitive,is_fx_sensitive,is_oil_sensitive,notes
+FINBK,Financials - Banks,FINANCIAL SERVICES,high,medium,low,NIM expansion on hikes; deposit cost lag
+FINNBFC,Financials - NBFC,FINANCIAL SERVICES,high,low,low,Cost of funds rises with repo; shorter ALM
+FININS,Financials - Insurance,FINANCIAL SERVICES,medium,low,low,
+IT,Information Technology,IT,low,high,low,USD revenue; INR depreciation is tailwind
+ENERGY_ONG,Energy - Oil & Gas,OIL GAS & CONSUMABLE FUELS,low,medium,high,Crude price sensitivity
+ENERGY_POW,Energy - Power,POWER,medium,low,medium,Coal input cost; regulated tariffs
+MATCEM,Materials - Cement,CONSTRUCTION MATERIALS,medium,low,medium,Rate cycle; infra demand
+MATSTL,Materials - Steel,METALS & MINING,low,medium,high,Global commodity; China demand
+MATALN,Materials - Aluminium,METALS & MINING,low,medium,high,Power cost driven
+CONAUT,Consumer Disc - Automobiles,AUTOMOBILE AND AUTO COMPONENTS,medium,low,high,Fuel cost; loan rates; rural demand
+CONJWL,Consumer Disc - Jewellery,CONSUMER DURABLES,low,medium,high,Gold price sensitivity
+CONPFMCG,Consumer Staples - FMCG,FAST MOVING CONSUMER GOODS,low,low,medium,Input cost inflation; rural demand
+CONPPHARM,Healthcare - Pharma,HEALTHCARE,low,medium,low,USD export revenue; regulated pricing
+CONPHSP,Healthcare - Hospitals,HEALTHCARE,low,low,low,
+COMTLC,Communication Services,TELECOMMUNICATION,low,low,low,Stable regulatory
+INDMFG,Industrials - Mfg and Infra,CAPITAL GOODS,medium,low,low,Govt capex cycle
+INDPRT,Industrials - Ports,SERVICES,low,medium,low,Trade volume linked
+UTLPWR,Utilities - Power,POWER,medium,low,medium,Regulated; fuel cost pass-through
+MATPNT,Materials - Paints,CHEMICALS,low,medium,medium,Crude derivatives input

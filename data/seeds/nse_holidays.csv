@@ -1,0 +1,102 @@
+date,description,exchange
+# NOTE: Coverage for 2016-2023 is partial. Full history must be verified from NSE circulars.
+# Source: https://www.nseindia.com/resources/exchange-communication-holidays
+# VERIFIED via Zerodha Kite API gap detection (2026-03-16): May 3 2022 confirmed holiday.
+# --- 2016 ---
+2016-01-26,Republic Day,NSE
+2016-03-07,Mahashivratri,NSE
+2016-03-24,Holi,NSE
+2016-03-25,Good Friday,NSE
+2016-04-14,Dr. Ambedkar Jayanti / Ram Navami,NSE
+2016-04-19,Mahavir Jayanti,NSE
+2016-07-06,Bakri Id,NSE
+2016-08-15,Independence Day,NSE
+2016-09-05,Ganesh Chaturthi,NSE
+2016-10-02,Mahatma Gandhi Jayanti,NSE
+2016-10-11,Dussehra,NSE
+2016-10-30,Diwali Laxmi Pujan,NSE
+2016-10-31,Diwali Balipratipada,NSE
+2016-11-14,Gurunanak Jayanti,NSE
+2016-12-25,Christmas,NSE
+# --- 2020 ---
+2020-02-21,Mahashivratri,NSE
+2020-03-10,Holi,NSE
+2020-04-02,Ram Navami,NSE
+2020-04-06,Mahavir Jayanti,NSE
+2020-04-10,Good Friday,NSE
+2020-04-14,Dr. Ambedkar Jayanti,NSE
+2020-05-01,Maharashtra Day,NSE
+2020-05-25,Id-Ul-Fitr,NSE
+2020-08-03,Bakri Id,NSE
+2020-08-15,Independence Day,NSE
+2020-08-22,Ganesh Chaturthi,NSE
+2020-10-02,Mahatma Gandhi Jayanti,NSE
+2020-10-25,Dussehra,NSE
+2020-11-14,Diwali Laxmi Pujan,NSE
+2020-11-16,Gurunanak Jayanti / Balipratipada,NSE
+2020-11-30,Gurunanak Jayanti,NSE
+2020-12-25,Christmas,NSE
+# --- 2022 (RBI hike + Ukraine case studies) ---
+2022-01-26,Republic Day,NSE
+2022-03-01,Mahashivratri,NSE
+2022-03-18,Holi,NSE
+2022-04-14,Dr. Ambedkar Jayanti,NSE
+2022-04-15,Good Friday,NSE
+2022-05-03,Id-Ul-Fitr (Eid ul Fitr),NSE
+2022-05-16,Buddha Purnima,NSE
+2022-07-10,Bakri Id,NSE
+2022-08-09,Muharram,NSE
+2022-08-15,Independence Day,NSE
+2022-08-31,Ganesh Chaturthi,NSE
+2022-10-02,Mahatma Gandhi Jayanti,NSE
+2022-10-05,Dussehra,NSE
+2022-10-24,Diwali Laxmi Pujan,NSE
+2022-10-26,Diwali Balipratipada,NSE
+2022-11-08,Gurunanak Jayanti,NSE
+2022-12-25,Christmas,NSE
+# --- 2024 ---
+2024-01-22,Pran Pratishtha (Special),NSE
+2024-01-26,Republic Day,NSE
+2024-03-08,Mahashivratri,NSE
+2024-03-25,Holi,NSE
+2024-03-29,Good Friday,NSE
+2024-04-11,Id-Ul-Fitr (Ramadan Eid),NSE
+2024-04-14,Dr. Ambedkar Jayanti,NSE
+2024-04-17,Ram Navami,NSE
+2024-04-21,Mahavir Jayanti,NSE
+2024-05-23,Buddha Purnima,NSE
+2024-06-17,Bakri Id,NSE
+2024-07-17,Muharram,NSE
+2024-08-15,Independence Day,NSE
+2024-10-02,Mahatma Gandhi Jayanti,NSE
+2024-10-12,Dussehra,NSE
+2024-11-01,Diwali Laxmi Pujan,NSE
+2024-11-15,Gurunanak Jayanti,NSE
+2024-12-25,Christmas,NSE
+# --- 2025 ---
+2025-01-26,Republic Day,NSE
+2025-02-26,Mahashivratri,NSE
+2025-03-14,Holi,NSE
+2025-03-31,Id-Ul-Fitr (Ramadan Eid),NSE
+2025-04-10,Shree Ram Navami,NSE
+2025-04-14,Dr. Ambedkar Jayanti,NSE
+2025-04-18,Good Friday,NSE
+2025-05-01,Maharashtra Day,NSE
+2025-08-15,Independence Day,NSE
+2025-08-27,Ganesh Chaturthi,NSE
+2025-10-02,Mahatma Gandhi Jayanti / Dussehra,NSE
+2025-10-20,Diwali Laxmi Pujan,NSE
+2025-10-21,Diwali Balipratipada,NSE
+2025-11-05,Gurunanak Jayanti,NSE
+2025-12-25,Christmas,NSE
+# --- 2026 ---
+2026-01-26,Republic Day,NSE
+2026-02-17,Mahashivratri,NSE
+2026-03-20,Holi,NSE
+2026-04-03,Good Friday,NSE
+2026-04-14,Dr. Ambedkar Jayanti,NSE
+2026-05-14,Buddha Purnima,NSE
+2026-08-15,Independence Day,NSE
+2026-10-02,Mahatma Gandhi Jayanti,NSE
+2026-11-10,Diwali Laxmi Pujan,NSE
+2026-12-25,Christmas,NSE
