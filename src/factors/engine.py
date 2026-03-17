@@ -175,7 +175,7 @@ def compute_and_store(d: date, force: bool = False) -> dict[str, Any] | None:
             # Update factor_map on existing row
             conn.execute(text("""
                 UPDATE market_state
-                SET factor_map = :fm::jsonb,
+                SET factor_map = CAST(:fm AS jsonb),
                     data_quality = jsonb_set(
                         COALESCE(data_quality, '{}'::jsonb),
                         '{has_factors}', 'true'::jsonb
@@ -185,8 +185,8 @@ def compute_and_store(d: date, force: bool = False) -> dict[str, Any] | None:
         else:
             # Insert skeleton row with factors
             conn.execute(text("""
-                INSERT INTO market_state (asof_ts_ist, session_id, universe_id, factor_map, data_quality)
-                VALUES (:ts, :sid, 'nifty50', :fm::jsonb, :dq::jsonb)
+                INSERT INTO market_state (asof_ts_ist, session_id, universe_id, factor_map, data_quality, replay_cutoff_ts)
+                VALUES (:ts, :sid, 'nifty50', CAST(:fm AS jsonb), CAST(:dq AS jsonb), :ts)
                 ON CONFLICT (universe_id, session_id) DO UPDATE SET
                     factor_map = EXCLUDED.factor_map
             """), {

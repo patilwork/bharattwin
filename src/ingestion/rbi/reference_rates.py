@@ -8,10 +8,11 @@ Published: ~12:30 IST on each business day (FBIL methodology).
 replay_cutoff_ts: 13:00 IST on the publication date.
 
 Technical notes:
-  - ASP.NET form — requires POST with __VIEWSTATE for date range queries
-  - Single-date fetch: can use GET with query param ?date=DD/MMM/YYYY
-  - Response: HTML table with currency pairs and rates
-  - RBI site is stable but slow; timeout 30s is usually sufficient
+  - ASP.NET form with WAF (Imperva/Cloudflare) — POST often blocked (HTTP 418)
+  - GET of the form page works, but returns empty without JS execution
+  - Fallback: store_manual() accepts rates directly (from Kite MCP USDINR quote
+    or manual entry) when scraping fails
+  - RBI site is stable but heavily protected against automated access
 """
 
 from __future__ import annotations
@@ -56,16 +57,54 @@ class RbiReferenceRateIngester(BaseIngester):
             logger.info("rbi_rates: serving from cache %s", cached)
             return cached.read_bytes()
 
-        # RBI archive GET endpoint: date in DD/MMM/YYYY format
-        date_str = date_.strftime("%d/%b/%Y")  # e.g. "02/May/2022"
-        url = f"{_BASE_URL}?date={date_str}"
+        client = self._get_client()
+        client.headers.update({"Referer": "https://www.rbi.org.in/"})
 
-        resp = self._get(url, retries=3)
+        # Step 1: GET the form page to extract ASP.NET hidden fields
+        self._rate_limit()
+        form_resp = client.get(_BASE_URL, timeout=30)
+        form_resp.raise_for_status()
+        import time as _time
+        self._last_request_ts = _time.monotonic()
+
+        viewstate = self._extract_field(form_resp.text, "__VIEWSTATE")
+        viewstate_gen = self._extract_field(form_resp.text, "__VIEWSTATEGENERATOR")
+        event_validation = self._extract_field(form_resp.text, "__EVENTVALIDATION")
+
+        # Step 2: POST with date range (same day for both from/to)
+        date_str = date_.strftime("%d/%m/%Y")  # DD/MM/YYYY
+        form_data = {
+            "__EVENTTARGET": "",
+            "__EVENTARGUMENT": "",
+            "__VIEWSTATE": viewstate,
+            "__VIEWSTATEGENERATOR": viewstate_gen,
+            "__EVENTVALIDATION": event_validation,
+            "txtFromDate": date_str,
+            "txtToDate": date_str,
+            "chkAll": "on",
+            "chkUSD": "on",
+            "chkGBP": "on",
+            "chkEURO": "on",
+            "chkYEN": "on",
+            "btnSearch": "Search",
+        }
+
+        self._rate_limit()
+        resp = client.post(_BASE_URL, data=form_data, timeout=30)
+        resp.raise_for_status()
+        self._last_request_ts = _time.monotonic()
         raw = resp.content
 
         raw_lake.store(self.source_id, date_, filename, raw)
         logger.info("rbi_rates: stored %d bytes", len(raw))
         return raw
+
+    @staticmethod
+    def _extract_field(html: str, field_name: str) -> str:
+        """Extract a hidden form field value from HTML."""
+        pattern = rf'name="{field_name}".*?value="(.*?)"'
+        m = re.search(pattern, html, re.DOTALL)
+        return m.group(1) if m else ""
 
     def parse(self, raw: bytes, date_: date) -> pd.DataFrame:
         """Extract FX rates from RBI HTML table."""
@@ -258,7 +297,7 @@ class RbiReferenceRateIngester(BaseIngester):
                     (asof_ts_ist, session_id, universe_id, macro_map, replay_cutoff_ts)
                 VALUES (
                     :ts, :session_id, 'nifty50',
-                    :macro_map::jsonb,
+                    CAST(:macro_map AS jsonb),
                     :replay_cutoff
                 )
                 ON CONFLICT (universe_id, session_id) DO UPDATE SET
@@ -274,3 +313,54 @@ class RbiReferenceRateIngester(BaseIngester):
 
         engine.dispose()
         return inserted
+
+
+def store_manual(d: date, rates: dict[str, float]) -> int:
+    """
+    Store FX rates manually (bypass scraping).
+
+    Use when RBI website is blocked (WAF/418). Accepts rates from
+    Kite MCP USDINR quote or manual entry.
+
+    Args:
+        d: Trading date
+        rates: Dict of currency pair → rate, e.g. {"USDINR": 86.75}
+    """
+    from sqlalchemy import create_engine, text
+    import json
+    import os
+
+    for pair, rate in rates.items():
+        lo, hi = _FX_BOUNDS.get(pair, (0.01, 1000))
+        if not (lo <= rate <= hi):
+            raise ValueError(f"{pair} rate {rate} outside bounds [{lo}, {hi}]")
+
+    db_url = os.environ.get(
+        "DATABASE_URL",
+        "postgresql://bharattwin:devpassword@localhost:5434/bharattwin"
+    )
+    engine = create_engine(db_url)
+
+    macro_patch = {"fx": {k.lower(): v for k, v in rates.items()}}
+    replay_cutoff = rbi_fx_cutoff(d).isoformat()
+
+    with engine.begin() as conn:
+        # Update usdinr_ref typed column if USDINR present
+        usdinr = rates.get("USDINR")
+        if usdinr:
+            conn.execute(text("""
+                UPDATE market_state SET usdinr_ref = :rate
+                WHERE session_id = :sid AND universe_id = 'nifty50'
+            """), {"rate": usdinr, "sid": f"CM_{d}"})
+
+        # Merge into macro_map
+        result = conn.execute(text("""
+            UPDATE market_state
+            SET macro_map = COALESCE(macro_map, '{}'::jsonb) || CAST(:patch AS jsonb)
+            WHERE session_id = :sid AND universe_id = 'nifty50'
+        """), {"patch": json.dumps(macro_patch), "sid": f"CM_{d}"})
+        affected = result.rowcount
+
+    engine.dispose()
+    logger.info("rbi_rates: manual store for %s → %s", d, rates)
+    return affected

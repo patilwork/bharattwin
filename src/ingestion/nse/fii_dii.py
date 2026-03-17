@@ -100,11 +100,13 @@ class FiiDiiIngester(BaseIngester):
                 row.get("category") or row.get("type") or row.get("investor", "")
             ).strip().upper()
 
-            if category not in ("FII", "DII", "FPI"):
+            # Normalise: "FII/FPI" → "FII", "FPI" → "FII"
+            if "FII" in category or "FPI" in category:
+                participant = "FII"
+            elif "DII" in category:
+                participant = "DII"
+            else:
                 continue
-
-            # FPI and FII are the same for our purposes
-            participant = "FII" if category in ("FII", "FPI") else "DII"
 
             def _num(key_candidates: list[str]) -> float | None:
                 for k in key_candidates:
