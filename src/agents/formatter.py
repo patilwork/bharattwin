@@ -134,6 +134,13 @@ def format_market_state(state: dict) -> str:
         lines.append("- N/A")
     lines.append("")
 
+    # --- Derivatives Positioning (if available in deriv_map) ---
+    deriv_map = _safe_json(state.get("deriv_map"))
+    if deriv_map and isinstance(deriv_map, dict) and deriv_map.get("pcr_oi"):
+        from src.ingestion.zerodha.derivatives import format_for_agents as fmt_deriv
+        lines.append(fmt_deriv(deriv_map))
+        lines.append("")
+
     # --- Morningstar Fundamentals (if available in macro_map) ---
     macro_map_parsed = _safe_json(state.get("macro_map"))
     ms_data = macro_map_parsed.get("morningstar", {}) if isinstance(macro_map_parsed, dict) else {}
