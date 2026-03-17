@@ -85,6 +85,14 @@ def _mutate_params(params: dict, temperature: float = 0.1) -> dict:
                 new_val = max(-2.0, min(2.0, new_val))
             elif "breadth" in key and "w_" not in key:
                 new_val = max(10.0, min(90.0, new_val))
+            elif "usdinr" in key and "w_" not in key:
+                new_val = max(0.05, min(2.0, abs(new_val)))
+                if "appreciation" in key:
+                    new_val = -new_val
+            elif "oi_" in key and "w_" not in key:
+                new_val = max(0.5, min(15.0, abs(new_val)))
+                if "drop" in key:
+                    new_val = -new_val
             elif "bounce" in key or "reversal" in key or "threshold" in key:
                 new_val = max(0.5, min(8.0, abs(new_val)))
             elif "penalty" in key:

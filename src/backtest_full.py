@@ -96,13 +96,23 @@ PARAMS = {
     # ── VIX change signal ──
     "w_vix_change": 0.07,         # NEW: 1-day VIX change weight
 
+    # ── USDINR signal ──
+    "usdinr_depreciation_threshold": 0.3,  # 1d INR weakening > this = bearish
+    "usdinr_appreciation_threshold": -0.3, # 1d INR strengthening < this = bullish
+    "w_usdinr": 0.05,
+
+    # ── Futures OI signal ──
+    "oi_rise_threshold": 3.0,     # OI up > 3% = positioning signal
+    "oi_drop_threshold": -3.0,    # OI down > 3% = unwinding
+    "w_oi_position": 0.05,
+
     # ── Signal weights ──
-    "w_momentum": 0.25,
-    "w_mean_revert": 0.20,
-    "w_vix_regime": 0.15,
-    "w_trend": 0.15,
+    "w_momentum": 0.22,
+    "w_mean_revert": 0.18,
+    "w_vix_regime": 0.12,
+    "w_trend": 0.13,
     "w_volatility": 0.05,
-    # Note: w_breadth, w_trend_20d, w_vix_change are separate above
+    # Note: w_breadth, w_trend_20d, w_vix_change, w_usdinr, w_oi_position are separate above
 }
 
 
@@ -115,10 +125,13 @@ def _compute_signal(
     vol_20d: float | None,
     breadth_pct_up: float | None,
     params: dict = PARAMS,
+    usdinr_change: float | None = None,
+    oi_change_pct: float | None = None,
 ) -> tuple[str, float]:
     """
-    Compute a directional signal from factors. v2 with 8 signal types.
+    Compute a directional signal from factors. v3 with 10 signal types.
 
+    New in v3: real breadth from bhavcopy, USDINR change, futures OI change.
     Returns (direction, expected_return_pct).
     """
     signals = {}
@@ -215,6 +228,34 @@ def _compute_signal(
     else:
         signals["vix_change"] = ("HOLD", 0.0)
 
+    # 9. NEW: USDINR change — INR depreciation = bearish (FII outflows)
+    if usdinr_change is not None:
+        usdinr_bear = params.get("usdinr_depreciation_threshold", 0.3)
+        usdinr_bull = params.get("usdinr_appreciation_threshold", -0.3)
+        if usdinr_change > usdinr_bear:
+            signals["usdinr"] = ("SELL", -0.2)  # INR weakening = FII selling
+        elif usdinr_change < usdinr_bull:
+            signals["usdinr"] = ("BUY", 0.15)   # INR strengthening = FII buying
+        else:
+            signals["usdinr"] = ("HOLD", 0.0)
+    else:
+        signals["usdinr"] = ("HOLD", 0.0)
+
+    # 10. NEW: Futures OI change — rising OI + falling price = bearish buildup
+    if oi_change_pct is not None:
+        oi_rise = params.get("oi_rise_threshold", 3.0)
+        oi_drop = params.get("oi_drop_threshold", -3.0)
+        if oi_change_pct > oi_rise and mom_1d < 0:
+            signals["oi_position"] = ("SELL", -0.2)   # Short buildup
+        elif oi_change_pct > oi_rise and mom_1d > 0:
+            signals["oi_position"] = ("BUY", 0.15)    # Long buildup
+        elif oi_change_pct < oi_drop:
+            signals["oi_position"] = ("HOLD", 0.0)    # Unwinding — uncertain
+        else:
+            signals["oi_position"] = ("HOLD", 0.0)
+    else:
+        signals["oi_position"] = ("HOLD", 0.0)
+
     # ── Weighted combination ──
     weights = {
         "momentum": params["w_momentum"],
@@ -225,6 +266,8 @@ def _compute_signal(
         "breadth": params.get("w_breadth", 0.10),
         "trend_20d": params.get("w_trend_20d", 0.08),
         "vix_change": params.get("w_vix_change", 0.07),
+        "usdinr": params.get("w_usdinr", 0.05),
+        "oi_position": params.get("w_oi_position", 0.05),
     }
 
     dir_score = 0.0
@@ -279,11 +322,26 @@ def run_full_backtest(params: dict | None = None) -> list[DayResult]:
     engine = create_engine(os.environ.get("DATABASE_URL", _DEFAULT_DB))
 
     with engine.connect() as conn:
+        # Main index data
         rows = conn.execute(text("""
-            SELECT session_id, nifty50_close, banknifty_close, india_vix
+            SELECT session_id, nifty50_close, banknifty_close, india_vix,
+                   usdinr_ref, repo_rate_pct, deriv_map
             FROM market_state
             WHERE nifty50_close IS NOT NULL AND universe_id = 'nifty50'
             ORDER BY session_id
+        """)).fetchall()
+
+        # Real breadth from bhavcopy_raw: advance/decline per date
+        breadth_rows = conn.execute(text("""
+            SELECT data_date,
+                   SUM(CASE WHEN close > prev_close THEN 1 ELSE 0 END) as adv,
+                   SUM(CASE WHEN close < prev_close THEN 1 ELSE 0 END) as dec,
+                   COUNT(*) as total
+            FROM bhavcopy_raw
+            WHERE series = 'EQ' AND prev_close IS NOT NULL AND prev_close > 0
+                  AND source = 'kite_historical'
+            GROUP BY data_date
+            ORDER BY data_date
         """)).fetchall()
 
     engine.dispose()
@@ -291,15 +349,36 @@ def run_full_backtest(params: dict | None = None) -> list[DayResult]:
     if len(rows) < 2:
         return []
 
+    # Build breadth lookup: date_str → (adv, dec, total, pct_up)
+    breadth_by_date: dict[str, tuple] = {}
+    for br in breadth_rows:
+        dt = str(br[0])
+        adv, dec, total = int(br[1]), int(br[2]), int(br[3])
+        pct_up = adv / total * 100 if total > 0 else None
+        breadth_by_date[dt] = (adv, dec, total, pct_up)
+
     results: list[DayResult] = []
 
-    # Compute rolling factors from the price series
-    closes = [(r[0], float(r[1]), float(r[2]) if r[2] else None, float(r[3]) if r[3] else None) for r in rows]
+    # Parse rows into tuples: (sid, nifty, bn, vix, usdinr, repo, deriv_map)
+    closes = []
+    for r in rows:
+        deriv = r[6]
+        if deriv and isinstance(deriv, str):
+            deriv = json.loads(deriv)
+        closes.append((
+            r[0],                              # session_id
+            float(r[1]),                       # nifty
+            float(r[2]) if r[2] else None,     # banknifty
+            float(r[3]) if r[3] else None,     # vix
+            float(r[4]) if r[4] else None,     # usdinr
+            float(r[5]) if r[5] else None,     # repo_rate
+            deriv or {},                        # deriv_map
+        ))
 
     for i in range(1, len(closes) - 1):
-        sid, nifty, bn, vix = closes[i]
-        _, next_nifty, _, _ = closes[i + 1]
-        _, prev_nifty, _, _ = closes[i - 1]
+        sid, nifty, bn, vix, usdinr, repo, deriv = closes[i]
+        _, next_nifty, _, _, _, _, _ = closes[i + 1]
+        _, prev_nifty, _, _, prev_usdinr, prev_repo, _ = closes[i - 1]
 
         actual_return = (next_nifty - nifty) / nifty * 100
         mom_1d = (nifty - prev_nifty) / prev_nifty * 100
@@ -330,18 +409,40 @@ def run_full_backtest(params: dict | None = None) -> list[DayResult]:
         # Previous day VIX (for VIX change signal)
         vix_prev = closes[i - 1][3] if i >= 1 else None
 
-        # Breadth proxy: % of last 5 days that were positive
-        # (real breadth needs bhavcopy; this is an index-level proxy)
-        if i >= 5:
+        # ── REAL BREADTH from bhavcopy_raw ──
+        date_str = sid.replace("CM_", "")
+        br = breadth_by_date.get(date_str)
+        if br:
+            breadth_pct_up = br[3]  # Real % of stocks advancing
+        elif i >= 5:
+            # Fallback to index proxy if no stock data for this date
             up_days = sum(1 for j in range(i - 4, i + 1)
                           if closes[j][1] > closes[j - 1][1])
             breadth_pct_up = up_days / 5 * 100
         else:
             breadth_pct_up = None
 
-        # Predict (v2: passes all new features)
+        # ── USDINR change signal ──
+        usdinr_change = None
+        if usdinr and prev_usdinr and prev_usdinr > 0:
+            usdinr_change = (usdinr - prev_usdinr) / prev_usdinr * 100
+
+        # ── Futures OI change signal ──
+        nifty_oi = None
+        if isinstance(deriv, dict):
+            nifty_oi = deriv.get("nifty_futures_oi")
+        prev_deriv = closes[i - 1][6] if i >= 1 else {}
+        prev_oi = None
+        if isinstance(prev_deriv, dict):
+            prev_oi = prev_deriv.get("nifty_futures_oi")
+        oi_change_pct = None
+        if nifty_oi and prev_oi and prev_oi > 0:
+            oi_change_pct = (nifty_oi - prev_oi) / prev_oi * 100
+
+        # Predict (v3: passes all real data)
         pred_dir, pred_ret = _compute_signal(
-            mom_1d, mom_5d, mom_20d, vix, vix_prev, vol_20d, breadth_pct_up, params
+            mom_1d, mom_5d, mom_20d, vix, vix_prev, vol_20d, breadth_pct_up,
+            params, usdinr_change=usdinr_change, oi_change_pct=oi_change_pct,
         )
 
         # Score
