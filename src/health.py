@@ -149,6 +149,56 @@ def run_health_check() -> dict[str, tuple[bool, str]]:
     return results
 
 
+def check_readiness() -> tuple[str, list[str]]:
+    """
+    Determine system readiness level.
+
+    Returns:
+        (level, reasons) where level is one of:
+        - "production-ok": live daily predictions can run and be scored
+        - "research-ok": backtesting and replay work, but no live tracking
+        - "setup-incomplete": missing critical components
+    """
+    issues = []
+
+    # Check for live prediction capability
+    from src.agents.llm_providers import has_api_key
+    if not has_api_key():
+        issues.append("No LLM API key — agents can only run in prompt mode")
+
+    # Check for stored predictions
+    try:
+        engine = create_engine(os.environ.get("DATABASE_URL", _DEFAULT_DB))
+        with engine.connect() as conn:
+            decisions = conn.execute(text("SELECT count(*) FROM agent_decisions")).scalar()
+            latest_ms = conn.execute(text(
+                "SELECT MAX(session_id) FROM market_state WHERE factor_map IS NOT NULL"
+            )).scalar()
+            bhavcopy_dates = conn.execute(text(
+                "SELECT count(DISTINCT data_date) FROM bhavcopy_raw"
+            )).scalar()
+            events = conn.execute(text("SELECT count(*) FROM event_store")).scalar()
+        engine.dispose()
+    except Exception:
+        return "setup-incomplete", ["Cannot connect to database"]
+
+    if bhavcopy_dates < 100:
+        issues.append(f"Only {bhavcopy_dates} bhavcopy dates — need 100+ for research")
+    if events < 5:
+        issues.append(f"Only {events} events in event_store — need 5+ for replay validation")
+    if decisions == 0:
+        issues.append("No stored agent_decisions — no live predictions have been scored")
+    if not latest_ms:
+        issues.append("No market_state rows with factor_map — factors not computed")
+
+    if "No LLM API key" in str(issues) or bhavcopy_dates < 100:
+        return "setup-incomplete", issues
+    elif decisions == 0:
+        return "research-ok", issues
+    else:
+        return "production-ok", issues
+
+
 def print_health() -> None:
     """Print health check report."""
     results = run_health_check()
@@ -166,8 +216,18 @@ def print_health() -> None:
             all_ok = False
         print(f"  [{icon}] {name:<15} {status:<6} {msg}")
 
+    # Readiness assessment
+    level, reasons = check_readiness()
+    level_icon = {"production-ok": "+", "research-ok": "~", "setup-incomplete": "X"}
+    print(f"\n  [{level_icon.get(level, '?')}] Readiness       {level.upper()}")
+    for r in reasons:
+        print(f"      — {r}")
+
     print("=" * 70)
-    print(f"  Overall: {'ALL CHECKS PASSED' if all_ok else 'SOME CHECKS FAILED'}")
+    overall = "ALL CHECKS PASSED" if all_ok and level == "production-ok" else (
+        "RESEARCH READY" if level == "research-ok" else "SOME CHECKS FAILED"
+    )
+    print(f"  Overall: {overall}")
     print("=" * 70)
 
 
