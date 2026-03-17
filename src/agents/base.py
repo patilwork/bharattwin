@@ -119,12 +119,28 @@ class BaseAgent:
         return self._parse_response(raw_text)
 
     def _parse_response(self, raw: str) -> AgentDecision:
-        """Parse LLM JSON response into AgentDecision, handling markdown fences."""
-        # Strip ```json ... ``` wrappers
+        """Parse LLM JSON response into AgentDecision, handling markdown fences and reasoning."""
         cleaned = raw.strip()
+
+        # Strategy 1: Extract ```json ... ``` fenced block
         match = re.search(r"```(?:json)?\s*\n?(.*?)\n?\s*```", cleaned, re.DOTALL)
         if match:
             cleaned = match.group(1).strip()
+        elif cleaned[0:1] != "{":
+            # Strategy 2: Find the first top-level JSON object by brace matching
+            start = cleaned.find("{")
+            if start >= 0:
+                depth = 0
+                end = start
+                for i in range(start, len(cleaned)):
+                    if cleaned[i] == "{":
+                        depth += 1
+                    elif cleaned[i] == "}":
+                        depth -= 1
+                        if depth == 0:
+                            end = i + 1
+                            break
+                cleaned = cleaned[start:end].strip()
 
         try:
             data = json.loads(cleaned)

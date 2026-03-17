@@ -41,7 +41,7 @@ PROVIDERS = {
     },
     "sarvam": {
         "env_key": "SARVAM_API_KEY",
-        "default_model": "sarvam-105b-chat",
+        "default_model": "sarvam-105b",
         "base_url": "https://api.sarvam.ai/v1",
     },
     "openai_compat": {
@@ -99,7 +99,12 @@ def call_llm(
                            f"Set {PROVIDERS[provider]['env_key']} in your environment.")
 
     config = PROVIDERS[provider]
-    model = model or os.environ.get("LLM_MODEL", config["default_model"])
+    # For non-anthropic providers, always use the provider's default model
+    # (persona configs specify claude models which won't work on Sarvam/OpenAI)
+    if provider != "anthropic":
+        model = os.environ.get("LLM_MODEL", config["default_model"])
+    else:
+        model = model or os.environ.get("LLM_MODEL", config["default_model"])
 
     if provider == "anthropic":
         return _call_anthropic(system, user, model, max_tokens)
@@ -136,20 +141,46 @@ def _call_openai_compat(system: str, user: str, model: str, max_tokens: int,
         "Content-Type": "application/json",
     }
 
+    # Some providers (Sarvam) work better with shorter prompts.
+    # Merge system into user, and for Sarvam, add explicit JSON instruction.
+    merged_user = f"{system}\n\n---\n\n{user}" if system else user
+
+    # Sarvam 105B: add explicit JSON-only instruction to avoid reasoning in output
+    if "sarvam" in (model or "").lower() or "sarvam" in (base_url or "").lower():
+        merged_user += (
+            "\n\nIMPORTANT: Respond with ONLY the JSON object. "
+            "No markdown fences, no explanation, no reasoning text. "
+            "Start your response with { and end with }."
+        )
+
     payload = {
         "model": model,
-        "max_tokens": max_tokens,
         "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
+            {"role": "user", "content": merged_user},
         ],
     }
 
-    response = httpx.post(url, headers=headers, json=payload, timeout=60)
+    response = httpx.post(url, headers=headers, json=payload, timeout=180)
     response.raise_for_status()
 
     data = response.json()
-    return data["choices"][0]["message"]["content"]
+    msg = data["choices"][0]["message"]
+
+    # Sarvam 105B is a reasoning model:
+    #   - reasoning_content: chain-of-thought (may contain JSON at the end)
+    #   - content: final answer (may be empty if model put everything in reasoning)
+    content = msg.get("content")
+    reasoning = msg.get("reasoning_content")
+
+    # Prefer content if it has substance (non-empty, non-refusal)
+    if content and len(content.strip()) > 20:
+        return content
+
+    # Fall back to reasoning_content (which often has the JSON embedded)
+    if reasoning and len(reasoning.strip()) > 20:
+        return reasoning
+
+    return content or reasoning or ""
 
 
 # Convenience: check what's available
