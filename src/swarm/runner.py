@@ -68,7 +68,10 @@ class SwarmConsensus:
 
 def _noise_for_variant(agent: SwarmAgent, archetype_base: float, archetype_conv: int) -> tuple[float, int, str]:
     """
-    Generate noise for a swarm variant based on its profile.
+    Generate structured noise for a swarm variant based on its 12-dimension profile.
+
+    The noise is NOT random — it's deterministic and shaped by the agent's
+    personality. Two agents with identical profiles produce identical outputs.
 
     Returns (adjusted_return, adjusted_conviction, direction).
     """
@@ -76,41 +79,85 @@ def _noise_for_variant(agent: SwarmAgent, archetype_base: float, archetype_conv:
 
     # Conviction bias shifts
     conv_shift = {
+        "very_cautious": -2,
         "cautious": -1,
         "moderate": 0,
         "aggressive": +1,
-        "contrarian": 0,  # handled separately
+        "contrarian": 0,
     }
 
-    # Risk tolerance affects magnitude
+    # Risk tolerance affects return magnitude
     risk_scale = {
-        "very_low": 0.5,
-        "low": 0.75,
+        "very_low": 0.4,
+        "low": 0.7,
         "medium": 1.0,
-        "high": 1.25,
-        "very_high": 1.5,
+        "high": 1.3,
+        "very_high": 1.6,
     }
 
-    # Experience affects noise (more experience = less noise)
-    exp_noise_scale = max(0.3, 1.0 - (agent.experience_years - 2) / 30)
+    # Herd sensitivity: herders amplify the archetype signal, contrarians dampen/flip
+    herd_scale = {
+        "contrarian": -0.3,      # Partially inverts
+        "independent": 1.0,      # Pure signal
+        "moderate_herder": 1.15,  # Slight amplification
+        "strong_herder": 1.4,    # Strong amplification (FOMO/panic)
+    }
 
-    # Base noise: gaussian with std proportional to base magnitude
-    noise_std = max(0.2, abs(archetype_base) * 0.3 * exp_noise_scale)
-    noise = rng.gauss(0, noise_std)
+    # Volatility preference affects conviction on high-vol events
+    vol_conv_mod = {
+        "vol_averse": -1,
+        "vol_neutral": 0,
+        "vol_seeking": +1,
+        "vol_trader": 0,
+    }
 
-    # Risk scale the return
+    # Loss aversion affects bearish predictions
+    loss_mod = {
+        "high_aversion": 0.15,    # Extra bearish offset
+        "moderate_aversion": 0.05,
+        "low_aversion": -0.05,
+        "loss_seeking": -0.15,    # Less bearish (doubles down)
+    }
+
+    # Portfolio size affects conviction (larger = more cautious)
+    port_conv = {
+        "micro_retail": +1,
+        "small_retail": 0,
+        "hni": 0,
+        "institutional_small": -1,
+        "institutional_large": -1,
+    }
+
+    # Experience reduces noise variance
+    exp_noise_scale = max(0.2, 1.0 - (agent.experience_years - 2) / 35)
+
+    # --- Compute adjusted return ---
+    base_noise_std = max(0.15, abs(archetype_base) * 0.25 * exp_noise_scale)
+    noise = rng.gauss(0, base_noise_std)
+
     scale = risk_scale.get(agent.risk_tolerance, 1.0)
-    adjusted = archetype_base * scale + noise
+    herd = herd_scale.get(getattr(agent, 'herd_sensitivity', 'independent'), 1.0)
 
-    # Conviction adjustment
-    adjusted_conv = max(1, min(5, archetype_conv + conv_shift.get(agent.conviction_bias, 0)))
+    adjusted = archetype_base * scale * herd + noise
 
-    # Contrarian: sometimes flips direction (20% chance)
-    if agent.conviction_bias == "contrarian" and rng.random() < 0.20:
-        adjusted = -adjusted * 0.5  # Flip but reduce magnitude
-        adjusted_conv = max(1, adjusted_conv - 1)
+    # Loss aversion offset (only when bearish)
+    if archetype_base < 0:
+        adjusted += loss_mod.get(getattr(agent, 'loss_aversion', 'moderate_aversion'), 0)
 
-    # Direction from return
+    # Contrarian conviction bias: 25% chance of direction flip
+    if agent.conviction_bias == "contrarian" and rng.random() < 0.25:
+        adjusted = -adjusted * 0.4
+    elif agent.conviction_bias == "very_cautious":
+        adjusted *= 0.6  # Dampens magnitude
+
+    # --- Compute conviction ---
+    adjusted_conv = archetype_conv
+    adjusted_conv += conv_shift.get(agent.conviction_bias, 0)
+    adjusted_conv += vol_conv_mod.get(getattr(agent, 'vol_preference', 'vol_neutral'), 0)
+    adjusted_conv += port_conv.get(getattr(agent, 'portfolio_size', 'small_retail'), 0)
+    adjusted_conv = max(1, min(5, adjusted_conv))
+
+    # --- Direction ---
     if adjusted > 0.25:
         direction = "BUY"
     elif adjusted < -0.25:
@@ -249,22 +296,31 @@ def print_swarm_result(result: SwarmConsensus, title: str = "") -> None:
 
 
 if __name__ == "__main__":
-    # Demo: amplify RBI hike replay to swarm
-    from src.replay.run_incontext_007 import AGENT_RESPONSES as rbi_resp
-    from src.replay.cases.rbi_hike_may2022 import ACTUAL_NIFTY_RETURN_PCT
+    import time
 
-    print("\nAmplifying RBI Hike replay to 800-agent swarm...")
-    result = amplify_to_swarm(rbi_resp, n_per_archetype=100)
-    print_swarm_result(result, "RBI Hike May 2022")
-    print(f"\n  Actual: {ACTUAL_NIFTY_RETURN_PCT:+.2f}%")
-    print(f"  Swarm error: {abs(result.mean_return_pct - ACTUAL_NIFTY_RETURN_PCT):.2f}pp")
+    replays = [
+        ("RBI Hike May 2022", "src.replay.run_incontext_007", "AGENT_RESPONSES",
+         "src.replay.cases.rbi_hike_may2022", "ACTUAL_NIFTY_RETURN_PCT"),
+        ("Exit Poll June 2024", "src.replay.run_exitpoll_011", "AGENT_RESPONSES",
+         "src.replay.cases.exit_poll_june2024", "ACTUAL_NIFTY_RETURN_PCT"),
+        ("Election June 2024", "src.replay.run_election_010", "AGENT_RESPONSES",
+         "src.replay.cases.election_june2024", "ACTUAL_NIFTY_RETURN_PCT"),
+    ]
 
-    # Exit poll replay
-    from src.replay.run_exitpoll_011 import AGENT_RESPONSES as exit_resp
-    from src.replay.cases.exit_poll_june2024 import ACTUAL_NIFTY_RETURN_PCT as exit_actual
+    import importlib
+    for name, resp_mod, resp_attr, actual_mod, actual_attr in replays:
+        rm = importlib.import_module(resp_mod)
+        am = importlib.import_module(actual_mod)
+        responses = getattr(rm, resp_attr)
+        actual = getattr(am, actual_attr)
 
-    print("\nAmplifying Exit Poll replay to 800-agent swarm...")
-    result2 = amplify_to_swarm(exit_resp, n_per_archetype=100)
-    print_swarm_result(result2, "Exit Poll June 2024")
-    print(f"\n  Actual: {exit_actual:+.2f}%")
-    print(f"  Swarm error: {abs(result2.mean_return_pct - exit_actual):.2f}pp")
+        # 100K swarm
+        n = 12_500
+        total = n * 8
+        t0 = time.time()
+        result = amplify_to_swarm(responses, n_per_archetype=n)
+        elapsed = time.time() - t0
+
+        print_swarm_result(result, f"{name} ({total:,} agents, {elapsed:.1f}s)")
+        print(f"  Actual: {actual:+.2f}%")
+        print(f"  Swarm error: {abs(result.mean_return_pct - actual):.2f}pp\n")
