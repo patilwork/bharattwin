@@ -35,6 +35,49 @@ from typing import Any
 from src.agents.schemas import Direction, ReturnRange
 from src.swarm.generator import SwarmAgent, generate_swarm, ARCHETYPES
 
+# ─── Volume & Price Impact Weights ───────────────────────────────────────────
+#
+# Based on real Indian market participation data:
+#   - NSE turnover breakdown (2024-25): Retail ~36%, FII ~18%, DII ~16%, Prop ~20%
+#   - Dabba/operator shadow market: ~₹3L cr/day (estimated, not in official data)
+#   - Price impact: institutional block orders > retail dispersed orders
+#
+# Two weight systems:
+#   1. VOLUME_WEIGHT: how many agents per archetype (population representation)
+#   2. IMPACT_WEIGHT: how much each archetype's vote counts in final consensus
+#
+# Volume determines how many variants are generated.
+# Impact determines how much each vote moves the consensus.
+
+VOLUME_WEIGHT = {
+    # How many agents per archetype (sums to ~1.0, scaled to total_agents)
+    "fii_quant":         0.12,   # ~12% — FII desks, global allocators
+    "retail_momentum":   0.25,   # ~25% — largest participant group by headcount
+    "dealer_hedging":    0.06,   # ~6%  — market makers, limited in number
+    "dii_mf":            0.12,   # ~12% — MFs, insurance, pension
+    "macro":             0.04,   # ~4%  — chief economists, strategists (few but influential)
+    "sector_rotation":   0.04,   # ~4%  — PMS quants, sector analysts
+    "corp_earnings":     0.05,   # ~5%  — fundamental analysts
+    "event_news":        0.07,   # ~7%  — prop desk event traders
+    "operator":          0.10,   # ~10% — operators, syndicates (Ahmedabad/Surat nexus)
+    "dabba_speculator":  0.15,   # ~15% — tier-2 satta traders (Rajkot/Indore belt)
+}
+
+IMPACT_WEIGHT = {
+    # Price impact multiplier — how much each vote moves the consensus
+    # Institutional money moves prices more per rupee than retail
+    "fii_quant":         3.0,    # FII block orders move Nifty 20-50 points
+    "retail_momentum":   0.5,    # Dispersed, small orders, low per-capita impact
+    "dealer_hedging":    2.5,    # Gamma hedging amplifies moves mechanically
+    "dii_mf":            2.0,    # Large SIP deployments, insurance buys
+    "macro":             1.5,    # Influences institutional positioning via reports
+    "sector_rotation":   1.0,    # PMS rebalancing, moderate block sizes
+    "corp_earnings":     1.0,    # Influences buy-side via research
+    "event_news":        1.5,    # Fast money, concentrated bets
+    "operator":          0.3,    # Operators mostly move small-caps, low Nifty impact
+    "dabba_speculator":  0.2,    # Dabba doesn't hit exchange order book directly
+}
+
 
 @dataclass
 class SwarmVote:
@@ -170,22 +213,43 @@ def _noise_for_variant(agent: SwarmAgent, archetype_base: float, archetype_conv:
 
 def amplify_to_swarm(
     archetype_decisions: dict[str, dict],
-    n_per_archetype: int = 100,
+    total_agents: int = 1_000_000,
+    use_volume_weights: bool = True,
+    use_impact_weights: bool = True,
 ) -> SwarmConsensus:
     """
-    Take 8 archetype decisions and amplify to a full swarm.
+    Take archetype decisions and amplify to a volume-weighted swarm.
 
     Args:
         archetype_decisions: {archetype_id: {direction, base_pct, conviction, ...}}
-        n_per_archetype: Variants per archetype.
+        total_agents: Total swarm size (default 1M).
+        use_volume_weights: Allocate agents proportional to real market participation.
+        use_impact_weights: Weight votes by price impact in consensus calculation.
 
     Returns:
         SwarmConsensus with population-level statistics.
     """
-    swarm = generate_swarm(n_per_archetype=n_per_archetype)
-    votes: list[SwarmVote] = []
+    # Determine agent count per archetype based on volume weights
+    available_archetypes = [a for a in ARCHETYPES if a in archetype_decisions]
 
-    for agent in swarm:
+    if use_volume_weights:
+        total_weight = sum(VOLUME_WEIGHT.get(a, 0.05) for a in available_archetypes)
+        agent_counts = {
+            a: max(100, int(total_agents * VOLUME_WEIGHT.get(a, 0.05) / total_weight))
+            for a in available_archetypes
+        }
+    else:
+        n_per = total_agents // len(available_archetypes)
+        agent_counts = {a: n_per for a in available_archetypes}
+
+    # Generate swarm with per-archetype counts
+    all_agents: list[SwarmAgent] = []
+    for arch in available_archetypes:
+        arch_swarm = generate_swarm(n_per_archetype=agent_counts[arch], archetypes=[arch])
+        all_agents.extend(arch_swarm)
+
+    votes: list[SwarmVote] = []
+    for agent in all_agents:
         arch_dec = archetype_decisions.get(agent.archetype)
         if not arch_dec:
             continue
@@ -203,30 +267,56 @@ def amplify_to_swarm(
             conviction=adj_conv,
         ))
 
-    # Aggregate
-    returns = [v.base_pct for v in votes]
-    returns_sorted = sorted(returns)
-    n = len(returns)
+    # --- Aggregate with impact weighting ---
+    n = len(votes)
 
+    if use_impact_weights:
+        # Impact-weighted mean return
+        weighted_sum = 0.0
+        total_impact = 0.0
+        for v in votes:
+            w = IMPACT_WEIGHT.get(v.archetype, 1.0)
+            weighted_sum += v.base_pct * w
+            total_impact += w
+        mean_ret = weighted_sum / total_impact if total_impact else 0
+
+        # Impact-weighted direction vote
+        buy_impact = sum(IMPACT_WEIGHT.get(v.archetype, 1.0) for v in votes if v.direction == Direction.BUY)
+        sell_impact = sum(IMPACT_WEIGHT.get(v.archetype, 1.0) for v in votes if v.direction == Direction.SELL)
+        hold_impact = sum(IMPACT_WEIGHT.get(v.archetype, 1.0) for v in votes if v.direction == Direction.HOLD)
+    else:
+        mean_ret = sum(v.base_pct for v in votes) / n if n else 0
+        buy_impact = sell_impact = hold_impact = 0  # Not used
+
+    # Raw counts (for display)
     buy_count = sum(1 for v in votes if v.direction == Direction.BUY)
     sell_count = sum(1 for v in votes if v.direction == Direction.SELL)
     hold_count = sum(1 for v in votes if v.direction == Direction.HOLD)
 
-    mean_ret = sum(returns) / n if n else 0
+    returns = [v.base_pct for v in votes]
+    returns_sorted = sorted(returns)
     median_ret = returns_sorted[n // 2] if n else 0
     std_ret = math.sqrt(sum((r - mean_ret) ** 2 for r in returns) / (n - 1)) if n > 1 else 0
 
-    # Consensus: majority vote
-    if buy_count > sell_count and buy_count > hold_count:
-        consensus_dir = Direction.BUY
-    elif sell_count > buy_count and sell_count > hold_count:
-        consensus_dir = Direction.SELL
+    # Consensus direction: impact-weighted if enabled, else raw majority
+    if use_impact_weights:
+        if buy_impact > sell_impact and buy_impact > hold_impact:
+            consensus_dir = Direction.BUY
+        elif sell_impact > buy_impact and sell_impact > hold_impact:
+            consensus_dir = Direction.SELL
+        else:
+            consensus_dir = Direction.HOLD
+        total_dir_impact = buy_impact + sell_impact + hold_impact
+        conviction_score = round(max(buy_impact, sell_impact, hold_impact) / total_dir_impact * 100, 1) if total_dir_impact else 0
     else:
-        consensus_dir = Direction.HOLD
-
-    # Conviction score: margin of majority (0-100)
-    max_votes = max(buy_count, sell_count, hold_count)
-    conviction_score = round(max_votes / n * 100, 1) if n else 0
+        if buy_count > sell_count and buy_count > hold_count:
+            consensus_dir = Direction.BUY
+        elif sell_count > buy_count and sell_count > hold_count:
+            consensus_dir = Direction.SELL
+        else:
+            consensus_dir = Direction.HOLD
+        max_votes = max(buy_count, sell_count, hold_count)
+        conviction_score = round(max_votes / n * 100, 1) if n else 0
 
     # Range: 5th and 95th percentile
     p5_idx = max(0, int(n * 0.05))
@@ -314,13 +404,10 @@ if __name__ == "__main__":
         responses = getattr(rm, resp_attr)
         actual = getattr(am, actual_attr)
 
-        # 100K swarm
-        n = 12_500
-        total = n * 8
         t0 = time.time()
-        result = amplify_to_swarm(responses, n_per_archetype=n)
+        result = amplify_to_swarm(responses, total_agents=100_000)
         elapsed = time.time() - t0
 
-        print_swarm_result(result, f"{name} ({total:,} agents, {elapsed:.1f}s)")
+        print_swarm_result(result, f"{name} ({result.total_agents:,} agents, {elapsed:.1f}s)")
         print(f"  Actual: {actual:+.2f}%")
         print(f"  Swarm error: {abs(result.mean_return_pct - actual):.2f}pp\n")
