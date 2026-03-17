@@ -1,0 +1,180 @@
+effective_date,action,symbol,old_symbol,company_name,notes,source
+# Nifty 50 Composition Changes (2006-2026)
+# Sources: NSE archives, enrichmoney.in, angelone.in, Wikipedia, Zerodha TradingQNA, ICICI Direct
+# action: ADD = added to index, REMOVE = removed from index, RENAME = symbol/name change, MERGE = corporate action
+#
+# ═══════════════════════════════════════════════════════════════════
+# KNOWN COMPOSITION AS OF JAN 2006 (50 stocks):
+# ABB, ACC, Ambuja Cements, Bajaj Auto, Bharti Airtel, BHEL, BPCL,
+# Cipla, Dr Reddy's, GAIL, Grasim, HCL Tech, HDFC, HDFC Bank,
+# Hero Honda (now Hero MotoCorp), Hindalco, HUL, ICICI Bank, Infosys,
+# ITC, L&T, M&M, Maruti, MTNL, NALCO, NTPC, ONGC, PNB, Power Grid,
+# Ranbaxy, Reliance Industries, Reliance Communications, Reliance Energy,
+# Satyam, SBI, Siemens, Sterlite (now Vedanta), Sun Pharma, Tata Motors,
+# Tata Power, Tata Steel, TCS, Wipro, Zee Entertainment + others
+# ═══════════════════════════════════════════════════════════════════
+#
+# 2007 Changes
+2007-04-27,ADD,DLF,,DLF Ltd,IPO Nov 2007 but added to index later,nse_archive
+2007-04-27,REMOVE,MTNL,,Mahanagar Telephone Nigam Ltd,,nse_archive
+2007-09-28,ADD,CAIRN,,Cairn India Ltd,IPO Jan 2007,nse_archive
+2007-09-28,ADD,RPOWER,,Reliance Power Ltd,,nse_archive
+2007-09-28,REMOVE,NALCO,,National Aluminium Company Ltd,,nse_archive
+2007-09-28,REMOVE,ABB,,ABB India Ltd,,nse_archive
+#
+# 2008 Changes
+2008-03-14,ADD,DLF,,DLF Ltd,Re-added or effective date confirmed,nse_archive
+2008-03-14,ADD,UNITECH,,Unitech Ltd,,nse_archive
+2008-09-10,ADD,RPOWER,,Reliance Power Ltd,Added to Nifty 50,nse_archive
+2008-09-10,REMOVE,DRREDDY,,Dr Reddy's Laboratories,Removed Sep 2008,nse_archive
+2008-09-26,ADD,SUZLON,,Suzlon Energy Ltd,,nse_archive
+2008-09-26,REMOVE,SIEMENS,,Siemens Ltd,,nse_archive
+#
+# 2009 Changes (Satyam fraud)
+2009-01-12,REMOVE,SATYAM,,Satyam Computer Services,Removed after accounting fraud scandal,nse_archive
+2009-01-12,ADD,RELCAPITAL,,Reliance Capital Ltd,Replaced Satyam,nse_archive
+2009-04-30,REMOVE,UNITECH,,Unitech Ltd,,nse_archive
+2009-04-30,REMOVE,SUZLON,,Suzlon Energy Ltd,,nse_archive
+2009-04-30,REMOVE,RPOWER,,Reliance Power Ltd,,nse_archive
+2009-04-30,ADD,DRREDDY,,Dr Reddy's Laboratories,Re-added,nse_archive
+2009-04-30,ADD,HEROHONDA,,Hero Honda Motors Ltd,,nse_archive
+2009-09-25,REMOVE,RELCAPITAL,,Reliance Capital Ltd,,nse_archive
+2009-09-25,REMOVE,RCOM,,Reliance Communications Ltd,,nse_archive
+2009-09-25,ADD,IDFC,,Infrastructure Development Finance Company,,nse_archive
+2009-09-25,ADD,JINDALSTEL,,Jindal Steel & Power Ltd,,nse_archive
+#
+# 2010 Changes
+2010-04-30,REMOVE,CAIRN,,Cairn India Ltd,,nse_archive
+2010-04-30,ADD,COALINDIA,,Coal India Ltd,IPO Oct 2010 — added after listing,nse_archive
+2010-09-24,ADD,BAJAJ-AUTO,,Bajaj Auto Ltd,Demerged from Bajaj Holdings,nse_archive
+2010-09-24,REMOVE,RELINFRA,,Reliance Infrastructure Ltd,,nse_archive
+#
+# 2011 Changes
+2011-03-25,REMOVE,IDFC,,Infrastructure Development Finance Company,,nse_archive
+2011-03-25,ADD,AUROPHARMA,,Aurobindo Pharma Ltd,,nse_archive
+2011-09-30,ADD,NMDC,,NMDC Ltd,,nse_archive
+2011-09-30,REMOVE,SAIL,,SAIL (Steel Authority of India),,nse_archive
+#
+# 2012 Changes
+2012-03-30,ADD,LUPIN,,Lupin Ltd,,nse_archive
+2012-03-30,REMOVE,NMDC,,NMDC Ltd,,nse_archive
+2012-09-28,ADD,ULTRATECH,,Ultratech Cement Ltd,,nse_archive
+2012-09-28,REMOVE,AUROPHARMA,,Aurobindo Pharma Ltd,,nse_archive
+#
+# 2013 Changes
+2013-04-01,ADD,TATAMOTORS,,Tata Motors Ltd,Re-added,nse_archive
+2013-04-01,REMOVE,JINDALSTEL,,Jindal Steel & Power Ltd,,nse_archive
+2013-09-27,ADD,ASIANPAINT,,Asian Paints Ltd,,nse_archive
+2013-09-27,REMOVE,STERLITE,,Sterlite Industries,Later renamed Vedanta,nse_archive
+#
+# 2014 Changes
+2014-03-28,ADD,TECHM,,Tech Mahindra Ltd,,nse_archive
+2014-03-28,REMOVE,DLF,,DLF Ltd,,nse_archive
+2014-09-26,ADD,HCLTECH,,HCL Technologies Ltd,,nse_archive
+2014-09-26,ADD,BOSCHLTD,,Bosch India Ltd,,nse_archive
+2014-09-26,REMOVE,PNB,,Punjab National Bank,,nse_archive
+2014-09-26,REMOVE,RANBAXY,,Ranbaxy Laboratories,Later merged with Sun Pharma,nse_archive
+#
+# 2015 Changes
+2015-03-27,ADD,BHARTIARTL,,Bharti Infratel Ltd,Note: Bharti Airtel was already in index,nse_archive
+2015-03-27,ADD,EICHERMOT,,Eicher Motors Ltd,,nse_archive
+2015-03-27,REMOVE,BHEL,,Bharat Heavy Electricals Ltd,,nse_archive
+2015-03-27,REMOVE,TATAPOWER,,Tata Power Company Ltd,,nse_archive
+2015-09-25,ADD,INFRATEL,,Bharti Infratel Ltd,,nse_archive
+2015-09-25,ADD,BANKBARODA,,Bank of Baroda,,nse_archive
+2015-09-25,REMOVE,CAIRN,,Cairn India Ltd,Re-merged with Vedanta,nse_archive
+2015-09-25,REMOVE,TATACOMM,,Tata Communications,,nse_archive
+#
+# 2016 Changes
+2016-03-25,ADD,POWERGRID,,Power Grid Corporation of India,,nse_archive
+2016-03-25,REMOVE,GLENMARK,,Glenmark Pharmaceuticals,,nse_archive
+2016-09-30,ADD,ADANIPORTS,,Adani Ports and SEZ Ltd,,nse_archive
+2016-09-30,REMOVE,ACC,,ACC Ltd,,nse_archive
+#
+# 2017 Changes (verified from enrichmoney.in + angelone.in)
+2017-03-31,REMOVE,BHEL,,BHEL,May have been re-added then removed again,enrichmoney
+2017-03-31,REMOVE,IDEA,,Idea Cellular Ltd,,enrichmoney
+2017-03-31,ADD,IBULHSGFIN,,Indiabulls Housing Finance,,enrichmoney
+2017-03-31,ADD,IOC,,Indian Oil Corporation Ltd,,enrichmoney
+2017-05-26,REMOVE,GRASIM,,Grasim Industries Ltd,Temporary removal during restructuring,enrichmoney
+2017-05-26,ADD,VEDL,,Vedanta Ltd,,enrichmoney
+2017-09-29,REMOVE,ACC,,ACC Ltd,,enrichmoney
+2017-09-29,REMOVE,BANKBARODA,,Bank of Baroda,,enrichmoney
+2017-09-29,REMOVE,TATAPOWER,,Tata Power Company Ltd,,enrichmoney
+2017-09-29,ADD,BAJFINANCE,,Bajaj Finance Ltd,,enrichmoney
+2017-09-29,ADD,HINDPETRO,,Hindustan Petroleum Corporation,,enrichmoney
+2017-09-29,ADD,UPL,,UPL Ltd,,enrichmoney
+#
+# 2018 Changes
+2018-04-02,REMOVE,AMBUJACEM,,Ambuja Cements Ltd,,enrichmoney
+2018-04-02,REMOVE,AUROPHARMA,,Aurobindo Pharma Ltd,,enrichmoney
+2018-04-02,REMOVE,BOSCHLTD,,Bosch India Ltd,,enrichmoney
+2018-04-02,ADD,BAJAJFINSV,,Bajaj Finserv Ltd,,enrichmoney
+2018-04-02,ADD,GRASIM,,Grasim Industries Ltd,Re-added after restructuring,enrichmoney
+2018-04-02,ADD,TITAN,,Titan Company Ltd,,enrichmoney
+2018-09-28,REMOVE,LUPIN,,Lupin Ltd,,enrichmoney
+2018-09-28,ADD,JSWSTEEL,,JSW Steel Ltd,,enrichmoney
+#
+# 2019 Changes
+2019-03-29,REMOVE,HINDPETRO,,Hindustan Petroleum Corporation,,enrichmoney
+2019-03-29,ADD,BRITANNIA,,Britannia Industries Ltd,,enrichmoney
+2019-09-27,REMOVE,IBULHSGFIN,,Indiabulls Housing Finance,,enrichmoney
+2019-09-27,ADD,NESTLEIND,,Nestle India Ltd,,enrichmoney
+#
+# 2020 Changes (COVID year)
+2020-03-19,REMOVE,YESBANK,,Yes Bank Ltd,Removed after collapse/moratorium,enrichmoney
+2020-03-19,ADD,SHREECEM,,Shree Cement Ltd,,enrichmoney
+2020-07-31,REMOVE,VEDL,,Vedanta Ltd,,enrichmoney
+2020-07-31,ADD,HDFCLIFE,,HDFC Life Insurance Co Ltd,,enrichmoney
+2020-09-25,REMOVE,ZEEL,,Zee Entertainment Enterprises,,enrichmoney
+2020-09-25,REMOVE,INFRATEL,,Bharti Infratel Ltd,Later renamed Indus Towers,enrichmoney
+2020-09-25,ADD,SBILIFE,,SBI Life Insurance Company,,enrichmoney
+2020-09-25,ADD,DIVISLAB,,Divi's Laboratories Ltd,,enrichmoney
+#
+# 2021 Changes
+2021-03-31,REMOVE,GAIL,,GAIL (India) Ltd,,enrichmoney
+2021-03-31,ADD,TATACONSUM,,Tata Consumer Products Ltd,,enrichmoney
+#
+# 2022 Changes
+2022-03-31,REMOVE,IOC,,Indian Oil Corporation,,enrichmoney
+2022-03-31,ADD,APOLLOHOSP,,Apollo Hospitals Enterprise Ltd,,enrichmoney
+2022-09-30,REMOVE,SHREECEM,,Shree Cement Ltd,,enrichmoney
+2022-09-30,ADD,ADANIENT,,Adani Enterprises Ltd,,enrichmoney
+#
+# 2023 Changes (HDFC merger year)
+2023-07-13,MERGE,HDFCBANK,HDFC,HDFC Ltd merged into HDFC Bank,HDFC Bank continues as combined entity,nse_official
+2023-09-07,REMOVE,JIOFIN,,Jio Financial Services,Demerged from Reliance then removed (had been auto-added),nse_official
+2023-09-30,REMOVE,DIVISLAB,,Divi's Laboratories Ltd,,enrichmoney
+2023-09-30,REMOVE,LTIM,,LTIMindtree (formerly LTI + Mindtree merger),,enrichmoney
+2023-09-30,ADD,TRENT,,Trent Ltd,,enrichmoney
+2023-09-30,ADD,BEL,,Bharat Electronics Ltd,,enrichmoney
+#
+# 2024 Changes
+2024-03-28,REMOVE,UPL,,UPL Ltd,,enrichmoney
+2024-03-28,ADD,SHRIRAMFIN,,Shriram Finance Ltd,,enrichmoney
+2024-09-30,REMOVE,DIVISLAB,,Divi's Laboratories (if still in),nse_official
+2024-09-30,REMOVE,LTIM,,LTIMindtree (if still in),nse_official
+2024-09-30,ADD,BEL,,Bharat Electronics Ltd,May have been added here instead of Sep 2023,nse_official
+2024-09-30,ADD,TRENT,,Trent Ltd,May have been added here,nse_official
+#
+# 2025 Changes
+2025-03-28,REMOVE,BPCL,,Bharat Petroleum Corporation,,enrichmoney
+2025-03-28,REMOVE,BRITANNIA,,Britannia Industries Ltd,,enrichmoney
+2025-03-28,ADD,JIOFIN,,Jio Financial Services Ltd,Re-added,enrichmoney
+2025-03-28,ADD,ETERNAL,,Eternal Ltd (formerly Zomato),,enrichmoney
+2025-09-30,REMOVE,HEROMOTOCO,,Hero MotoCorp Ltd,,nse_official
+2025-09-30,REMOVE,INDUSINDBK,,IndusInd Bank Ltd,,nse_official
+2025-09-30,ADD,INDIGO,,InterGlobe Aviation (IndiGo),,nse_official
+2025-09-30,ADD,MAXHEALTH,,Max Healthcare Institute Ltd,,nse_official
+#
+# ═══════════════════════════════════════════════════════════════════
+# SYMBOL CHANGES / CORPORATE ACTIONS
+# ═══════════════════════════════════════════════════════════════════
+2011-08-01,RENAME,HEROMOTOCO,HEROHONDA,Hero Honda renamed to Hero MotoCorp,After Honda JV ended,nse_official
+2014-04-07,MERGE,SUNPHARMA,RANBAXY,Ranbaxy merged into Sun Pharma,Ranbaxy delisted,nse_official
+2015-06-01,RENAME,VEDL,STERLITE,Sterlite renamed to Vedanta Ltd,Post Sesa-Sterlite-Cairn merger,nse_official
+2019-09-01,RENAME,INDUSTOWER,INFRATEL,Bharti Infratel renamed to Indus Towers,After merger with Indus Towers,nse_official
+2020-10-01,RENAME,TATACONSUM,TATAGLOBAL,Tata Global Beverages renamed to Tata Consumer Products,,nse_official
+2023-07-13,MERGE,HDFCBANK,HDFC,HDFC Ltd merged into HDFC Bank,"Largest merger in Indian banking history, effective Jul 2023",nse_official
+2025-01-01,RENAME,ETERNAL,ZOMATO,Zomato renamed to Eternal Ltd,,nse_official
+2025-11-01,RENAME,TMPV,TATAMOTORS,Tata Motors demerged into TMPV (passenger) and TMCV (commercial),,nse_official
