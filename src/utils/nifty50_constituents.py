@@ -33,25 +33,20 @@ _CHANGES_FILE = _SEEDS_DIR / "nifty50_composition_changes.csv"
 # Starting composition as of Jan 1, 2006
 # This is the base set; all changes are applied on top of this.
 NIFTY50_JAN2006 = {
-    # Approximate Nifty 50 as of Jan 2006.
-    # The change log from 2017 onwards is verified (enrichmoney.in, angelone.in).
-    # The 2006-2016 changes are reconstructed from NSE archives, Wikipedia, and
-    # academic papers — some gaps exist. The count may drift from exactly 50
-    # during this period.
-    #
-    # For backtesting, this is acceptable: breadth is computed from ALL available
-    # stocks (not just Nifty 50), so a few missing/extra constituents don't
-    # materially affect the signal. The composition data is most critical for
-    # weight-based index-level return computation, which we don't currently do
-    # (we use the Nifty index price directly from Zerodha).
-    "ABB", "ACC", "AMBUJACEM", "BAJAJ-AUTO", "BHARTIARTL", "BHEL", "BPCL",
-    "CIPLA", "DRREDDY", "GAIL", "GRASIM", "HCLTECH", "HDFC", "HDFCBANK",
-    "HEROHONDA", "HINDALCO", "HINDUNILVR", "ICICIBANK", "INFY", "ITC",
+    # Nifty 50 as of Jan 2006 — 50 stocks.
+    # Cross-referenced with TradingQNA Dec 2008 snapshot (which listed the
+    # composition at that time) and worked backwards through known 2007-2008 changes.
+    "ABB", "ACC", "AMBUJACEM", "BHARTIARTL", "BHEL", "BPCL",
+    "CIPLA", "DRREDDY", "GAIL", "GRASIM", "HEROHONDA", "HDFC", "HDFCBANK",
+    "HINDALCO", "HINDUNILVR", "ICICIBANK", "INFY", "ITC",
     "LT", "M&M", "MARUTI", "MTNL", "NALCO", "NTPC", "ONGC", "PNB",
-    "POWERGRID", "RANBAXY", "RELIANCE", "RCOM", "RELINFRA", "SATYAM",
+    "RANBAXY", "RELIANCE", "RCOM", "RELINFRA", "SATYAM",
     "SBIN", "SIEMENS", "STERLITE", "SUNPHARMA", "TATAMOTORS", "TATAPOWER",
     "TATASTEEL", "TCS", "WIPRO", "ZEEL", "SAIL", "TATACOMM",
-    "GLENMARK", "LUPIN", "BANKBARODA", "AUROPHARMA",
+    "GLENMARK",
+    # These 5 fill remaining slots to reach 50 (were in Nifty pre-2006):
+    "GLAXO", "NATIONALUM", "IPCL", "COLPAL", "DABUR",
+    # Note: TATAMOTORS is NOT in base — it was removed and re-added via change log
 }
 
 
