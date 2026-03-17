@@ -10,6 +10,8 @@ from src.agents.personas.macro import PERSONA as MACRO
 from src.agents.personas.sector_rotation import PERSONA as SECTOR_ROTATION
 from src.agents.personas.corp_earnings import PERSONA as CORP_EARNINGS
 from src.agents.personas.event_news import PERSONA as EVENT_NEWS
+from src.agents.personas.operator import PERSONA as OPERATOR
+from src.agents.personas.dabba_speculator import PERSONA as DABBA_SPECULATOR
 
 ALL_PERSONAS = [
     FII_QUANT,
@@ -20,6 +22,8 @@ ALL_PERSONAS = [
     SECTOR_ROTATION,
     CORP_EARNINGS,
     EVENT_NEWS,
+    OPERATOR,
+    DABBA_SPECULATOR,
 ]
 
 PERSONA_BY_ID = {p.agent_id: p for p in ALL_PERSONAS}

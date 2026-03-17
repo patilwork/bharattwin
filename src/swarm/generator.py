@@ -57,6 +57,7 @@ from src.agents.schemas import PersonaConfig
 ARCHETYPES = [
     "fii_quant", "retail_momentum", "dealer_hedging", "dii_mf",
     "macro", "sector_rotation", "corp_earnings", "event_news",
+    "operator", "dabba_speculator",
 ]
 
 ARCHETYPE_ROLES = {
@@ -68,6 +69,8 @@ ARCHETYPE_ROLES = {
     "sector_rotation": "Sector Rotation Analyst",
     "corp_earnings": "Corporate Earnings Analyst",
     "event_news": "Event / News Trader",
+    "operator": "Operator / Syndicate Player",
+    "dabba_speculator": "Dabba / Tier-2 Speculator",
 }
 
 # ─── 12 Variation Dimensions ────────────────────────────────────────────────
@@ -86,26 +89,30 @@ EXPERIENCE_YEARS = list(range(2, 30))
 
 # 5. Regional flavor (20)
 REGIONAL_FLAVORS = [
-    ("Mumbai_Dalal", "Dalal Street veteran, reads ET and Mint at 6am"),
+    ("Mumbai_Dalal", "Dalal Street veteran, reads ET and Mint at 6am, been through 2008"),
     ("Mumbai_BKC", "BKC institutional desk, Bloomberg terminal, FII flow tracker"),
-    ("Mumbai_Nariman", "Nariman Point old guard, remembers Harshad Mehta firsthand"),
+    ("Mumbai_Nariman", "Nariman Point old guard, remembers Harshad Mehta and Ketan Parekh firsthand"),
+    ("Mumbai_Andheri", "Sub-broker network operator, knows what retail is buying before the data shows"),
     ("Bangalore", "Tech-savvy, builds quant models in Python, follows NASDAQ for cues"),
     ("Delhi_Lutyens", "Politically connected, front-runs policy from North Block whispers"),
     ("Delhi_Noida", "F&O trader, high leverage, watches Nifty options chain all day"),
     ("Chennai", "Conservative value investor, reads Business Line, holds 5+ years"),
-    ("Ahmedabad", "Textile/pharma expertise, tracks Gujarat SMEs and IPOs"),
-    ("Kolkata", "Old-school chartist, Magadh pattern reader, follows Sucheta Dalal"),
+    ("Ahmedabad", "Textile/pharma expertise, tracks Gujarat SMEs and IPOs, strong operator networks"),
+    ("Kolkata", "Old-school chartist, follows Sucheta Dalal, remembers the plantation company scams"),
     ("Pune", "IT services analyst, tracks Infosys/TCS campus hiring as lead indicator"),
     ("Hyderabad", "Pharma sector specialist, tracks FDA approvals and ANDA filings"),
-    ("Jaipur", "MSME lending specialist, understands tier-2 credit cycles"),
+    ("Rajkot", "Satta capital of India — pure speculator, trades F&O on gut feel, massive leverage, herds with the group"),
+    ("Indore", "Speculative trader hub, dabba trading background, commodity-to-equity crossover, high-conviction high-turnover"),
+    ("Jaipur", "Jewellery/gold trader turned equity speculator, reads gold for equity cues"),
     ("Kochi", "Gulf remittance tracker, monitors Kerala gold imports and NRI flows"),
+    ("Surat", "Diamond/textile money flowing into markets, tracks SME IPOs obsessively"),
+    ("Lucknow", "Government contractor background, reads budget and capex announcements first"),
     ("NRI_US_NYC", "Wall Street EM desk, thinks in USD, tracks DXY and US 10Y"),
     ("NRI_US_SV", "Silicon Valley techie, invests in India from Robinhood, momentum-driven"),
     ("NRI_Dubai", "Gulf NRI, tracks crude and INR remittance rates, bullish India long-term"),
     ("NRI_Singapore", "EM allocator at a sovereign fund, compares India vs China vs Vietnam"),
     ("NRI_London", "City of London, tracks India GDR/ADR premiums, understands FPI regulations"),
-    ("Indore", "Soybean trader turned equity investor, understands commodity cycles"),
-    ("Chandigarh", "Real estate background, tracks rate cycles for property-equity correlation"),
+    ("Chandigarh", "Real estate money in markets, tracks rate cycles for property-equity rotation"),
 ]
 
 # 6. Sector specialization (12)

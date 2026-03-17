@@ -37,8 +37,8 @@ from src.replay.cases.rbi_hike_may2022 import MARKET_STATE, EVENT
 
 def test_persona_registry_count():
     """All 8 personas registered."""
-    assert len(ALL_PERSONAS) == 8
-    assert len(PERSONA_BY_ID) == 8
+    assert len(ALL_PERSONAS) == 10
+    assert len(PERSONA_BY_ID) == 10
 
 
 def test_persona_ids():
@@ -46,6 +46,7 @@ def test_persona_ids():
     expected = {
         "fii_quant", "retail_momentum", "dealer_hedging", "dii_mf",
         "macro", "sector_rotation", "corp_earnings", "event_news",
+        "operator", "dabba_speculator",
     }
     assert set(PERSONA_BY_ID.keys()) == expected
 
@@ -119,7 +120,7 @@ def test_prompt_mode_returns_8_prompts():
         mode="prompt",
     )
     assert isinstance(result, list)
-    assert len(result) == 8
+    assert len(result) == 10
     for agent_id, prompt_str in result:
         assert agent_id in PERSONA_BY_ID
         assert isinstance(prompt_str, str)
@@ -323,7 +324,7 @@ def test_replay_prompt_mode():
     from src.replay.cases.rbi_hike_may2022 import run_replay
     result = run_replay(mode="prompt")
     assert isinstance(result, list)
-    assert len(result) == 8
+    assert len(result) == 10
 
 
 # --- 8. In-Context Replay ---
