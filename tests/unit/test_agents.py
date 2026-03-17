@@ -345,3 +345,17 @@ def test_incontext_replay_consensus():
     assert error < 1.0, f"Prediction error {error:.2f}pp exceeds 1pp threshold"
     # Actual should fall within the predicted range
     assert consensus.return_range.low_pct <= ACTUAL_NIFTY_RETURN_PCT <= consensus.return_range.high_pct
+
+
+def test_election_replay_consensus():
+    """Election 2024 replay: direction correct and error under 2pp."""
+    from src.replay.run_election_010 import run_election_replay
+    from src.replay.cases.election_june2024 import ACTUAL_NIFTY_RETURN_PCT
+
+    consensus = run_election_replay()
+
+    assert consensus.consensus_direction == Direction.SELL
+    assert consensus.bear_count == 8
+    error = abs(consensus.avg_return_pct - ACTUAL_NIFTY_RETURN_PCT)
+    assert error < 2.0, f"Prediction error {error:.2f}pp exceeds 2pp threshold"
+    assert consensus.return_range.low_pct <= ACTUAL_NIFTY_RETURN_PCT <= consensus.return_range.high_pct
