@@ -141,24 +141,47 @@ def _call_openai_compat(system: str, user: str, model: str, max_tokens: int,
         "Content-Type": "application/json",
     }
 
-    # Some providers (Sarvam) work better with shorter prompts.
-    # Merge system into user, and for Sarvam, add explicit JSON instruction.
-    merged_user = f"{system}\n\n---\n\n{user}" if system else user
+    is_sarvam = "sarvam" in (model or "").lower() or "sarvam" in (base_url or "").lower()
 
-    # Sarvam 105B: add explicit JSON-only instruction to avoid reasoning in output
-    if "sarvam" in (model or "").lower() or "sarvam" in (base_url or "").lower():
-        merged_user += (
-            "\n\nIMPORTANT: Respond with ONLY the JSON object. "
-            "No markdown fences, no explanation, no reasoning text. "
-            "Start your response with { and end with }."
+    if is_sarvam:
+        # Sarvam 105B strategy: two-message conversation
+        # Message 1 (user): market context
+        # Message 2 (assistant): acknowledge
+        # Message 3 (user): demand JSON only
+        #
+        # This forces the model to separate reasoning (done in msg 1 processing)
+        # from output (pure JSON in msg 3 response).
+        context = f"{system}\n\n---\n\n{user}" if system else user
+
+        json_demand = (
+            "Based on the market data above, provide your prediction as a single JSON object. "
+            "RULES:\n"
+            "1. Your ENTIRE response must be valid JSON — nothing else\n"
+            "2. No markdown, no explanation, no reasoning\n"
+            "3. Start with { and end with }\n"
+            "4. Required fields: direction, confidence_pct, nifty_return (with low_pct/base_pct/high_pct), "
+            "sector_views (3+ sectors), thesis, key_factors, risks, conviction"
         )
 
-    payload = {
-        "model": model,
-        "messages": [
-            {"role": "user", "content": merged_user},
-        ],
-    }
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "user", "content": context},
+                {"role": "assistant", "content": "I have analyzed the market data. I will now provide my prediction as a JSON object."},
+                {"role": "user", "content": json_demand},
+            ],
+            "reasoning_effort": "low",
+            "temperature": 0,
+            "max_tokens": 4096,
+        }
+    else:
+        merged_user = f"{system}\n\n---\n\n{user}" if system else user
+        payload = {
+            "model": model,
+            "messages": [
+                {"role": "user", "content": merged_user},
+            ],
+        }
 
     response = httpx.post(url, headers=headers, json=payload, timeout=180)
     response.raise_for_status()
