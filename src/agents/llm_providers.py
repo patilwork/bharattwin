@@ -167,19 +167,23 @@ def _call_openai_compat(system: str, user: str, model: str, max_tokens: int,
     msg = data["choices"][0]["message"]
 
     # Sarvam 105B is a reasoning model:
-    #   - reasoning_content: chain-of-thought (may contain JSON at the end)
-    #   - content: final answer (may be empty if model put everything in reasoning)
-    content = msg.get("content")
-    reasoning = msg.get("reasoning_content")
+    #   - content: final answer (should have JSON)
+    #   - reasoning_content: chain-of-thought (may have JSON at the end)
+    content = msg.get("content") or ""
+    reasoning = msg.get("reasoning_content") or ""
 
-    # Prefer content if it has substance (non-empty, non-refusal)
-    if content and len(content.strip()) > 20:
-        return content
+    # Strategy: find whichever field contains a JSON object
+    # Check content first (preferred), then reasoning
+    for text in [content, reasoning]:
+        text = text.strip()
+        if not text:
+            continue
+        # If it starts with { or contains a { — likely has JSON
+        brace_pos = text.find("{")
+        if brace_pos >= 0:
+            return text
 
-    # Fall back to reasoning_content (which often has the JSON embedded)
-    if reasoning and len(reasoning.strip()) > 20:
-        return reasoning
-
+    # Nothing has JSON — return whatever we got
     return content or reasoning or ""
 
 

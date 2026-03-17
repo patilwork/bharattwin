@@ -108,15 +108,71 @@ class BaseAgent:
         raise ValueError(f"Unknown mode: {mode}")
 
     def _call_api(self, system: str, user: str) -> AgentDecision:
-        """Call LLM API (Anthropic, Sarvam, or OpenAI-compatible) and parse response."""
-        from src.agents.llm_providers import call_llm
+        """
+        Call LLM API with retry on parse failure.
 
-        raw_text = call_llm(
-            system=system,
-            user=user,
-            model=self.persona.model,
-        )
+        Strategy:
+          1. Try full prompt
+          2. On parse failure, retry with condensed prompt (shorter context)
+          3. On second failure, raise
+        """
+        from src.agents.llm_providers import call_llm, get_provider
+
+        # Attempt 1: full prompt
+        raw_text = call_llm(system=system, user=user, model=self.persona.model)
+        try:
+            return self._parse_response(raw_text)
+        except ValueError:
+            pass  # Fall through to retry
+
+        # Attempt 2: condensed prompt — strip sector matrix and top movers,
+        # add stronger JSON instruction
+        logger.info("agent %s: retrying with condensed prompt", self.persona.agent_id)
+        condensed_user = self._condense_prompt(user)
+        raw_text = call_llm(system="", user=condensed_user, model=self.persona.model)
         return self._parse_response(raw_text)
+
+    def _condense_prompt(self, user: str) -> str:
+        """
+        Create a shorter version of the prompt for retry.
+
+        Removes verbose sections (sector matrix, full top movers list) and
+        adds an aggressive JSON-only instruction.
+        """
+        lines = user.split("\n")
+        condensed = []
+        skip_section = False
+
+        for line in lines:
+            # Skip the sector sensitivity matrix (large table)
+            if "## Sector Sensitivity Matrix" in line:
+                skip_section = True
+                condensed.append("(Sector sensitivity data omitted for brevity)")
+                continue
+            if skip_section and line.startswith("## "):
+                skip_section = False
+            if skip_section:
+                continue
+
+            # Keep top movers but limit to 5
+            condensed.append(line)
+
+        result = "\n".join(condensed)
+
+        # Prepend persona context and append strong JSON instruction
+        result = (
+            f"You are {self.persona.role}. {self.persona.description}\n\n"
+            f"{result}\n\n"
+            "CRITICAL: Your entire response must be a single valid JSON object.\n"
+            "Do NOT include any text, explanation, or reasoning outside the JSON.\n"
+            "Do NOT use markdown fences.\n"
+            "Start with {{ and end with }}.\n"
+            "Schema: {{\"direction\":\"BUY/SELL/HOLD\",\"confidence_pct\":number,"
+            "\"nifty_return\":{{\"low_pct\":number,\"base_pct\":number,\"high_pct\":number}},"
+            "\"sector_views\":{{\"SECTOR\":{{\"direction\":\"BUY/SELL/HOLD\",\"reasoning\":\"...\"}}}},"
+            "\"thesis\":\"...\",\"key_factors\":[\"...\"],\"risks\":[\"...\"],\"conviction\":1-5}}"
+        )
+        return result
 
     def _parse_response(self, raw: str) -> AgentDecision:
         """Parse LLM JSON response into AgentDecision, handling markdown fences and reasoning."""
@@ -145,8 +201,18 @@ class BaseAgent:
         try:
             data = json.loads(cleaned)
         except json.JSONDecodeError as e:
-            logger.error("agent %s: failed to parse JSON: %s\nRaw: %s", self.persona.agent_id, e, raw[:500])
-            raise ValueError(f"Failed to parse agent response as JSON: {e}") from e
+            # Attempt repair: if JSON is truncated, try to close it
+            repaired = self._try_repair_json(cleaned)
+            if repaired:
+                try:
+                    data = json.loads(repaired)
+                    logger.info("agent %s: repaired truncated JSON", self.persona.agent_id)
+                except json.JSONDecodeError:
+                    logger.error("agent %s: failed to parse JSON: %s\nRaw: %s", self.persona.agent_id, e, raw[:500])
+                    raise ValueError(f"Failed to parse agent response as JSON: {e}") from e
+            else:
+                logger.error("agent %s: failed to parse JSON: %s\nRaw: %s", self.persona.agent_id, e, raw[:500])
+                raise ValueError(f"Failed to parse agent response as JSON: {e}") from e
 
         # Inject agent metadata
         data["agent_id"] = self.persona.agent_id
@@ -154,6 +220,60 @@ class BaseAgent:
         data["raw_response"] = raw
 
         return AgentDecision(**data)
+
+    @staticmethod
+    def _try_repair_json(text: str) -> str | None:
+        """
+        Try to repair truncated JSON by closing open braces/brackets.
+
+        Sarvam 105B sometimes truncates output mid-JSON. If the JSON has
+        all required top-level fields but is just missing closing braces,
+        we can repair it.
+        """
+        if not text or text[0] != "{":
+            return None
+
+        # Check if required fields are present
+        required = ["direction", "confidence_pct", "nifty_return", "thesis", "conviction"]
+        if not all(f'"{f}"' in text for f in required):
+            return None
+
+        # Truncate at the last complete key-value pair
+        # Find the last complete string value (ending with ")
+        last_quote = text.rfind('"')
+        if last_quote < 10:
+            return None
+
+        # Try progressively closing the JSON
+        for suffix in [
+            '"}]}',      # close string, array, object
+            '"}}',       # close string, nested object, object
+            '"]}}',      # close string, array, nested object, object
+            '"}]}}',     # deeper nesting
+            '"}',        # just close string and object
+        ]:
+            candidate = text[:last_quote + 1] + suffix
+            try:
+                json.loads(candidate)
+                return candidate
+            except json.JSONDecodeError:
+                continue
+
+        # Brute force: count open braces and close them
+        opens = text.count("{") - text.count("}")
+        open_brackets = text.count("[") - text.count("]")
+        if opens > 0 or open_brackets > 0:
+            # Truncate to last complete value
+            truncated = text[:last_quote + 1]
+            truncated += "]" * max(0, open_brackets)
+            truncated += "}" * max(0, opens)
+            try:
+                json.loads(truncated)
+                return truncated
+            except json.JSONDecodeError:
+                pass
+
+        return None
 
     def _format_prompt_output(self, system: str, user: str) -> str:
         """Format prompts for manual copy-paste execution."""
