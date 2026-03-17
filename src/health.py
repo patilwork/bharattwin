@@ -91,11 +91,13 @@ def check_bhavcopy() -> tuple[bool, str]:
 
 
 def check_api_key() -> tuple[bool, str]:
-    """Check if ANTHROPIC_API_KEY is set."""
-    key = os.environ.get("ANTHROPIC_API_KEY", "")
-    if key:
-        return True, f"Set ({len(key)} chars, starts with {key[:8]}...)"
-    return False, "NOT SET — agents will run in prompt mode only"
+    """Check if any LLM API key is set (Sarvam, Anthropic, or OpenAI-compatible)."""
+    from src.agents.llm_providers import available_providers, get_provider
+    available = available_providers()
+    if available:
+        current = get_provider()
+        return True, f"Provider: {current} | Available: {', '.join(available)}"
+    return False, "NO LLM KEY SET — agents will run in prompt mode only. Set SARVAM_API_KEY or ANTHROPIC_API_KEY."
 
 
 def check_agents() -> tuple[bool, str]:

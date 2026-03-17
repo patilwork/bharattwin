@@ -7,7 +7,8 @@
 | Metric | Result |
 |--------|--------|
 | Replay cases | 4 (2 SELL, 1 BUY, 1 no-event) |
-| Direction accuracy | 4/4 (100%) |
+| Event direction accuracy | 3/3 (100%) |
+| Overall direction (incl no-event) | 3/4 (75%) |
 | Average error | 0.65pp |
 | RMSE | 0.73pp |
 | In-range | 4/4 (100%) |
@@ -40,7 +41,7 @@
                           ┌───────────────────┘
                           ▼
                    ┌─────────────┐    ┌─────────────┐
-                   │  Events     │───▸│  8 Agents   │
+                   │  Events     │───▸│  10 Agents  │
                    │  (manual)   │    │  (7:00 PM)  │
                    └─────────────┘    └─────────────┘
                                               │

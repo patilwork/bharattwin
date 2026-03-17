@@ -1,12 +1,14 @@
 """
-Tests for agent framework v1.
+Tests for agent framework.
 
 Covers:
-  1. Persona registry (8 entries)
+  1. Persona registry (10 archetypes)
   2. Formatter output
-  3. Prompt mode (8 prompt strings returned)
+  3. Prompt mode (10 prompt strings returned)
   4. Schema validation
   5. Response parsing
+  6. Aggregation (incl HOLD-majority)
+  7. Replay cases (RBI hike, election, exit poll)
 """
 
 from __future__ import annotations

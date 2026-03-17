@@ -1,12 +1,12 @@
 # BharatTwin 🇮🇳
 
-**1 million AI agents that predict the Indian stock market. Every day. With a public scoreboard.**
+**1 million AI agents that simulate the Indian stock market. Open-source. Transparent replay scoreboard.**
 
 BharatTwin is an open-source swarm intelligence engine built specifically for the Indian equity market. Ten specialist archetypes — from FII quant strategists to Rajkot dabba speculators — each spawn up to 100,000 agent variants across 12 personality dimensions (96.7 billion unique combinations). The swarm analyzes live NSE data and produces a population-level consensus Nifty 50 prediction.
 
 Think [MiroFish](https://github.com/666ghj/MiroFish) but purpose-built for Indian markets. Where MiroFish simulates generic social agents, BharatTwin simulates **the actual participants of Dalal Street** — FIIs, DIIs, dealers, retail traders, macro strategists — each with India-specific knowledge, regional biases, and behavioral profiles. Powered by [Sarvam 105B](https://www.sarvam.ai/models) (India-built LLM) or Claude.
 
-Every prediction is scored against the actual outcome. No hiding. No cherry-picking. Just a transparent, public track record.
+Replay predictions are scored against actual outcomes. No cherry-picking. The scoreboard shows every call, including misses. Live daily predictions are the next milestone.
 
 ## How It Works
 
@@ -46,10 +46,10 @@ NSE Bhavcopy + Zerodha + RBI + Morningstar
 | RBI Surprise Hike (May 2022) | -2.29% | -1.99% | 0.30pp | ✅ SELL |
 | Election Results (Jun 2024) | -5.93% | -5.01% | 0.92pp | ✅ SELL |
 | Exit Poll Euphoria (Jun 2024) | +3.25% | +2.88% | 0.37pp | ✅ BUY |
-| No-Event Day (Mar 2026) | +1.00% | -0.03% | 1.03pp | ⚠️ HOLD |
-| **Average** | | | **0.65pp** | **4/4** |
+| No-Event Day (Mar 2026) | +1.00% | -0.03% | 1.03pp | ⚠️ HOLD (miss) |
+| **Average** | | | **0.65pp** | **3/4 directional** |
 
-> Event-driven predictions: **0.53pp average error**. The agents shine when it matters most.
+> Event-driven predictions: **0.53pp average error, 3/3 direction correct**. No-event days are harder — the system honestly outputs HOLD when uncertain.
 
 ## Agent Leaderboard
 
@@ -72,25 +72,32 @@ git clone https://github.com/yourrepo/bharattwin.git
 cd bharattwin
 
 # Setup
-pip install -r requirements.txt
+pip install -e .
+pip install fastapi uvicorn  # optional, for API server
 docker run -d --name bharattwin_db -e POSTGRES_DB=bharattwin \
   -e POSTGRES_USER=bharattwin -e POSTGRES_PASSWORD=devpassword \
   -p 5434:5432 postgres:16
 
 # Run pipeline
-python -m src.pipeline 2026-03-16 --mode prompt
+python3 -m src.pipeline 2026-03-16 --mode prompt
 
 # View dashboard
-python -m src.dashboard --full
+python3 -m src.dashboard --full
 
 # Run health check
-python -m src.health
+python3 -m src.health
 
 # Run backtests
-python -m src.backtest --replay-only
+python3 -m src.backtest --replay-only
 
 # Agent calibration
-python -m src.calibration
+python3 -m src.calibration
+
+# 20-year factor backtest (5,008 days)
+python3 -m src.backtest_full
+
+# Autoresearch optimization (1000 experiments)
+python3 -m src.autoresearch --n 1000
 ```
 
 ## Architecture
@@ -113,7 +120,7 @@ python -m src.calibration
 | Morningstar | Moat, P/E, P/B, star rating, fair value | MCP |
 | Seeds | Holidays, constituents, sector map, expiry calendar | CSV |
 
-**20 years of data:** 5,010 trading days (Jan 2006 — Mar 2026). Nifty from 2,633 to 26,329.
+**20-year index spine:** 5,010 trading days of Nifty/BankNifty/VIX (Jan 2006 — Mar 2026). Rich inputs (bhavcopy, flows, factors, F&O) currently populated for ~25 recent trading days. Historical enrichment is a Phase 1 task.
 
 ## Why BharatTwin?
 
@@ -128,7 +135,7 @@ No global tool models these India-specific signals. BharatTwin does.
 
 ## Built With
 
-- Python 3.14 + Pydantic + SQLAlchemy + FastAPI
+- Python 3.11+ (tested on 3.14) + Pydantic + SQLAlchemy + FastAPI
 - PostgreSQL 16 (Alembic migrations)
 - [Sarvam 105B](https://www.sarvam.ai/models) (India-built, free API) / Claude Sonnet 4.6
 - Zerodha Kite MCP + Morningstar MCP
@@ -138,12 +145,14 @@ No global tool models these India-specific signals. BharatTwin does.
 
 | Metric | Value |
 |--------|-------|
-| Codebase | 9,429 LOC, 68 files, 24 commits |
-| Agents | 10 archetypes, 1M swarm variants |
-| Data | 5,010 trading days (20 years) |
-| Replay accuracy | 0.65pp avg error, 4/4 direction |
-| Autoresearch | 46.5% direction on 5,008 days |
+| Codebase | 9,429 LOC, 68 files, 25 commits |
+| Agents | 10 archetypes, 1M swarm variants (amplified from 10 LLM calls) |
+| Index data | 5,010 trading days (20-year Nifty/BN/VIX spine) |
+| Rich data | ~25 recent days with bhavcopy, factors, flows, F&O |
+| Replay accuracy | 0.65pp avg error, 3/3 event direction correct |
+| Factor backtest | 46.5% direction on 5,008 days (autoresearch-optimized) |
 | LLM cost | ₹0 (Sarvam 105B free tier) |
+| Live predictions | Not yet — prototype/replay stage |
 | Tests | 21 passing |
 
 ## License
