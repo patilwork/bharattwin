@@ -110,20 +110,28 @@ def _aggregate(d: date, decisions: list[AgentDecision]) -> ConsensusResult:
 
     avg_return_pct = round(weighted_base, 4)
 
-    # Consensus direction: majority vote, conviction-weighted tiebreak
-    if bull_count > bear_count and bull_count > neutral_count:
+    # Consensus direction: conviction-weighted with HOLD respect
+    # Step 1: compute conviction mass per direction
+    buy_conviction = sum(dec.conviction for dec in decisions if dec.direction == Direction.BUY)
+    sell_conviction = sum(dec.conviction for dec in decisions if dec.direction == Direction.SELL)
+    hold_conviction = sum(dec.conviction for dec in decisions if dec.direction == Direction.HOLD)
+
+    # Step 2: if HOLD has the most conviction mass, respect it
+    if hold_conviction >= buy_conviction and hold_conviction >= sell_conviction:
+        # HOLD wins unless directional conviction is overwhelming
+        directional_conviction = buy_conviction + sell_conviction
+        if directional_conviction > hold_conviction * 1.5:
+            # Directional agents are 1.5x more convicted than neutral — override HOLD
+            consensus_dir = Direction.BUY if buy_conviction > sell_conviction else Direction.SELL
+        else:
+            consensus_dir = Direction.HOLD
+    elif bull_count > bear_count and bull_count > neutral_count:
         consensus_dir = Direction.BUY
     elif bear_count > bull_count and bear_count > neutral_count:
         consensus_dir = Direction.SELL
     else:
         # Tiebreak: conviction-weighted direction score
-        dir_score = 0.0
-        for dec in decisions:
-            w = dec.conviction / total_conviction
-            if dec.direction == Direction.BUY:
-                dir_score += w
-            elif dec.direction == Direction.SELL:
-                dir_score -= w
+        dir_score = (buy_conviction - sell_conviction) / total_conviction
         if dir_score > 0.1:
             consensus_dir = Direction.BUY
         elif dir_score < -0.1:

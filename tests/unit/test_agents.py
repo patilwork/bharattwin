@@ -256,6 +256,66 @@ def test_aggregate_consensus():
     assert consensus.avg_return_pct < 0  # weighted toward bearish
 
 
+def test_aggregate_hold_majority():
+    """When HOLD conviction dominates, consensus should be HOLD, not forced directional."""
+    decisions = [
+        AgentDecision(
+            agent_id="a", agent_role="A", direction=Direction.SELL,
+            confidence_pct=55, conviction=2,
+            nifty_return=ReturnRange(low_pct=-2.0, base_pct=-0.5, high_pct=0.8),
+            thesis="mildly bearish", key_factors=["x"], risks=["y"],
+        ),
+        AgentDecision(
+            agent_id="b", agent_role="B", direction=Direction.SELL,
+            confidence_pct=62, conviction=3,
+            nifty_return=ReturnRange(low_pct=-2.5, base_pct=-0.8, high_pct=0.5),
+            thesis="bearish", key_factors=["x"], risks=["y"],
+        ),
+        AgentDecision(
+            agent_id="c", agent_role="C", direction=Direction.BUY,
+            confidence_pct=60, conviction=3,
+            nifty_return=ReturnRange(low_pct=-0.5, base_pct=0.5, high_pct=1.5),
+            thesis="contrarian", key_factors=["x"], risks=["y"],
+        ),
+        AgentDecision(
+            agent_id="d", agent_role="D", direction=Direction.HOLD,
+            confidence_pct=50, conviction=2,
+            nifty_return=ReturnRange(low_pct=-1.5, base_pct=0.2, high_pct=1.5),
+            thesis="neutral", key_factors=["x"], risks=["y"],
+        ),
+        AgentDecision(
+            agent_id="e", agent_role="E", direction=Direction.HOLD,
+            confidence_pct=45, conviction=1,
+            nifty_return=ReturnRange(low_pct=-1.5, base_pct=0.0, high_pct=1.2),
+            thesis="no data", key_factors=["x"], risks=["y"],
+        ),
+        AgentDecision(
+            agent_id="f", agent_role="F", direction=Direction.HOLD,
+            confidence_pct=55, conviction=2,
+            nifty_return=ReturnRange(low_pct=-1.0, base_pct=0.3, high_pct=1.2),
+            thesis="neutral", key_factors=["x"], risks=["y"],
+        ),
+        AgentDecision(
+            agent_id="g", agent_role="G", direction=Direction.HOLD,
+            confidence_pct=48, conviction=2,
+            nifty_return=ReturnRange(low_pct=-1.0, base_pct=0.2, high_pct=1.0),
+            thesis="neutral", key_factors=["x"], risks=["y"],
+        ),
+        AgentDecision(
+            agent_id="h", agent_role="H", direction=Direction.HOLD,
+            confidence_pct=30, conviction=1,
+            nifty_return=ReturnRange(low_pct=-1.0, base_pct=0.0, high_pct=1.0),
+            thesis="no event", key_factors=["x"], risks=["y"],
+        ),
+    ]
+    consensus = _aggregate(date(2026, 3, 16), decisions)
+    # 5 HOLD / 2 SELL / 1 BUY — HOLD should win, not SELL
+    assert consensus.consensus_direction == Direction.HOLD
+    assert consensus.neutral_count == 5
+    assert consensus.bear_count == 2
+    assert consensus.bull_count == 1
+
+
 # --- 7. Replay Case ---
 
 def test_replay_prompt_mode():

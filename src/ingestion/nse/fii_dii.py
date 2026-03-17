@@ -93,6 +93,23 @@ class FiiDiiIngester(BaseIngester):
         else:
             raise ValueError(f"fii_dii: unexpected response structure: {type(data)}")
 
+        # IMPORTANT: NSE API often returns the LATEST available date regardless of
+        # which date was requested. Validate that the response date matches.
+        if rows:
+            response_date_str = rows[0].get("date", "")
+            if response_date_str:
+                try:
+                    from datetime import datetime
+                    response_date = datetime.strptime(response_date_str, "%d-%b-%Y").date()
+                    if response_date != date_:
+                        logger.warning(
+                            "fii_dii: API returned data for %s but requested %s — discarding",
+                            response_date, date_,
+                        )
+                        return pd.DataFrame()  # Return empty — don't store wrong-date data
+                except ValueError:
+                    pass  # Can't parse date — proceed anyway
+
         records = []
         for row in rows:
             # Normalise keys (different API versions use different key names)
