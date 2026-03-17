@@ -22,6 +22,11 @@
 | LLM | Sarvam 105B integrated (free API, tested on single replays) |
 | Autoresearch | 42% → 46.5% direction (1000 experiments, 70s) |
 | F&O data | PCR, max pain, OI chain via Kite MCP |
+| Stock data | 518,952 rows — 96 stocks × 5,010 dates loaded |
+| Repo rate | All 5,010 dates covered (29 rate changes) |
+| USDINR | 2,004 dates (Sep 2017+) from Kite CDS |
+| Futures OI | Nifty 3,825 dates + BankNifty 3,726 dates |
+| Composition | Nifty 50 changes tracked 2006-2026, 101 symbols |
 
 ## Phase 1 Goals
 
@@ -88,11 +93,16 @@
 - [ ] 10 no-event days: random selection from different market regimes
 - [ ] Target: 24+ cases for statistical significance
 
-### P1.5 — Data Enrichment ✅ MOSTLY DONE
+### P1.5 — Data Enrichment ✅ DONE
 - [x] 20-year index backfill: 5,010 days (Jan 2006 — Mar 2026) via Zerodha
-- [x] Morningstar fundamentals: moat, P/E, P/B, fair value for Nifty heavyweights
-- [x] F&O derivatives: OI chain, PCR, max pain, ATM straddle via Kite MCP
+- [x] 96-stock OHLCV: 518,952 rows via Kite historical API
+- [x] Morningstar fundamentals: moat, P/E, P/B, fair value for 76 stocks
+- [x] F&O derivatives: live OI chain + historical futures OI (3,700+ dates)
+- [x] Repo rate: all 5,010 dates (29 MPC decisions since 2006)
+- [x] USDINR: 2,004 dates from Kite CDS futures
+- [x] Nifty 50 composition: CSV + Python module, 101 symbols, handles renames/mergers
 - [ ] News/event auto-ingestion: RSS feed or API (not yet built)
+- [ ] FII/DII daily flows: historical daily data not available via API (monthly aggregates ready)
 
 ### P1.6 — Production Database
 - [ ] Migration from local Docker to managed Postgres (Supabase/Neon/RDS)

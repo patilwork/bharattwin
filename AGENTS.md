@@ -106,7 +106,7 @@ Each persona in `src/agents/personas/` has a unique `SYSTEM_PROMPT` and `Persona
 
 ### Key Data Stores (PostgreSQL)
 
-- **`bhavcopy_raw`** — NSE EOD OHLCV per symbol per date (EQ series)
+- **`bhavcopy_raw`** — 518,952 rows: 96 stocks × 5,010 dates (Kite historical + NSE bhavcopy)
 - **`market_state`** — one row per trading day; typed columns for Nifty/BankNifty/VIX + JSONB maps: `returns_map`, `flow_map`, `macro_map`, `factor_map`, `regime_state`
 - **`flow_store`** — FII/DII buy/sell/net flows by participant and segment
 - **`calendar_store`** — trading calendar with expiry flags (monthly/weekly for Nifty, BankNifty, FinNifty)

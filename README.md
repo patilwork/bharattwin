@@ -120,7 +120,7 @@ python3 -m src.autoresearch --n 1000
 | Morningstar | Moat, P/E, P/B, star rating, fair value | MCP |
 | Seeds | Holidays, constituents, sector map, expiry calendar | CSV |
 
-**20-year index spine:** 5,010 trading days of Nifty/BankNifty/VIX (Jan 2006 — Mar 2026). Rich inputs (bhavcopy, flows, factors, F&O) currently populated for ~25 recent trading days. Historical enrichment is a Phase 1 task.
+**20 years of data:** 5,010 trading days of Nifty/BankNifty/VIX + 518,952 stock-level rows (96 stocks) + repo rate history + USDINR + Nifty/BankNifty futures OI. Nifty 50 historical composition tracked with all renames and mergers.
 
 ## Why BharatTwin?
 
@@ -145,14 +145,15 @@ No global tool models these India-specific signals. BharatTwin does.
 
 | Metric | Value |
 |--------|-------|
-| Codebase | 9,429 LOC, 68 files, 25 commits |
+| Codebase | ~10,000 LOC, 70+ files, 32 commits |
 | Agents | 10 archetypes, 1M swarm variants (amplified from 10 LLM calls) |
 | Index data | 5,010 trading days (20-year Nifty/BN/VIX spine) |
-| Rich data | ~25 recent days with bhavcopy, factors, flows, F&O |
+| Stock data | 518,952 rows — 96 stocks × 5,010 dates from Kite |
+| Macro data | Repo rate (all dates), USDINR (2,004 dates), Futures OI (3,700+ dates) |
 | Replay accuracy | 0.65pp avg error, 3/3 event direction correct |
-| Factor backtest | 46.5% direction on 5,008 days (autoresearch-optimized) |
+| Factor backtest | 46.0% direction on 5,008 days (autoresearch on real stock data) |
 | LLM cost | ₹0 (Sarvam 105B free tier) |
-| Live predictions | Not yet — prototype/replay stage |
+| Live predictions | Not yet — daily cron is next step |
 | Tests | 21 passing |
 
 ## License
