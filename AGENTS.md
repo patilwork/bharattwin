@@ -70,9 +70,9 @@ python -m src.agents.llm_providers
 
 **Tests:**
 ```bash
-pytest                            # run all tests
-pytest tests/unit/test_agents.py  # unit tests only (no DB needed)
-pytest tests/unit/test_agents.py::test_incontext_replay_consensus  # single test
+python3 -m pytest                            # run all tests
+python3 -m pytest tests/unit/test_agents.py  # unit tests only (no DB needed)
+python3 -m pytest tests/unit/test_agents.py::test_incontext_replay_consensus  # single test
 ```
 
 **Lint / typecheck:**

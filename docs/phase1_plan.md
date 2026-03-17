@@ -19,7 +19,7 @@
 | Codebase | 9,429 LOC, 68 files |
 | Swarm | 1M agents, 10 archetypes, 7 regime profiles |
 | Data | 5,010 trading days (20 years) |
-| LLM | Sarvam 105B live (free) |
+| LLM | Sarvam 105B integrated (free API, tested on single replays) |
 | Autoresearch | 42% → 46.5% direction (1000 experiments, 70s) |
 | F&O data | PCR, max pain, OI chain via Kite MCP |
 

@@ -2,7 +2,7 @@
 
 **1 million AI agents that simulate the Indian stock market. Open-source. Transparent replay scoreboard.**
 
-BharatTwin is an open-source swarm intelligence engine built specifically for the Indian equity market. Ten specialist archetypes — from FII quant strategists to Rajkot dabba speculators — each spawn up to 100,000 agent variants across 12 personality dimensions (96.7 billion unique combinations). The swarm analyzes live NSE data and produces a population-level consensus Nifty 50 prediction.
+BharatTwin is an open-source swarm intelligence engine built specifically for the Indian equity market. Ten specialist archetypes — from FII quant strategists to Rajkot dabba speculators — each spawn up to 100,000 agent variants across 12 personality dimensions (96.7 billion unique combinations). The swarm analyzes NSE data and produces a population-level consensus Nifty 50 direction estimate.
 
 Think [MiroFish](https://github.com/666ghj/MiroFish) but purpose-built for Indian markets. Where MiroFish simulates generic social agents, BharatTwin simulates **the actual participants of Dalal Street** — FIIs, DIIs, dealers, retail traders, macro strategists — each with India-specific knowledge, regional biases, and behavioral profiles. Powered by [Sarvam 105B](https://www.sarvam.ai/models) (India-built LLM) or Claude.
 

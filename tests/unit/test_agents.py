@@ -38,7 +38,7 @@ from src.replay.cases.rbi_hike_may2022 import MARKET_STATE, EVENT
 # --- 1. Persona Registry ---
 
 def test_persona_registry_count():
-    """All 8 personas registered."""
+    """All 10 personas registered."""
     assert len(ALL_PERSONAS) == 10
     assert len(PERSONA_BY_ID) == 10
 
@@ -113,8 +113,8 @@ def test_load_sector_sensitivities():
 
 # --- 3. Prompt Mode ---
 
-def test_prompt_mode_returns_8_prompts():
-    """run_all in prompt mode returns 8 (agent_id, prompt_string) tuples."""
+def test_prompt_mode_returns_10_prompts():
+    """run_all in prompt mode returns 10 (agent_id, prompt_string) tuples."""
     result = run_all(
         d=date(2022, 5, 2),
         market_state=MARKET_STATE,
