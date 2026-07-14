@@ -15,14 +15,21 @@ Realistic edge: **~4-6%/yr alpha over a liquid-equity benchmark, Sharpe ~0.9,
 25-40% drawdowns** — good, not get-rich. No real money until the paper track
 confirms (~2-3 months). Automation is built ~60%.
 
-**TIER 1 upgrades DONE (2026-07-14, §7 + docs/tier1_upgrades_results.md).**
-One real upgrade found: a **market-MA trend overlay** that cuts max drawdown
--38%→-19% (Sharpe 1.19→1.40) — wire into papertrack/kill-switch. 12-1 spec
-confirmed optimal (FIP/12-2 rejected). CPCV: 100% OOS paths Sharpe>0, PBO 29%
-(strongest robustness yet). Low-vol/low-beta benched (regime flip directional only).
+**DONE 2026-07-14 (all pushed to origin/superquant-foundation):**
+- TIER 1 sweep — one real upgrade: **market-MA trend overlay** (maxDD -38%→-19%,
+  Sharpe 1.19→1.40). 12-1 confirmed optimal; CPCV 100% OOS paths Sharpe>0, PBO 29%;
+  low-vol benched. (docs/tier1_upgrades_results.md)
+- Trend overlay **wired into papertrack** (`_market_regime`, de-risk to cash) +
+  same-date dup guard. (src/papertrack.py)
+- **Phase A monthly orchestrator** built — data gate→score→signal+overlay→order
+  tickets→dup-guarded record→report; cron wrapper. PAPER ONLY. (src/orchestrator.py)
+- **TIER 2 live quality/forensic overlay** — deep-fundamental snapshot screen,
+  9/25 live picks flagged; `--quality` in orchestrator. (src/quality.py)
+- 44 tests pass.
 
-**Immediate next task: wire the trend overlay into papertrack + pick TIER 2 vs
-automation Phase A (§7).**
+**Immediate next task options: Phase B (kill-switch/monitoring: drawdown halt,
+data-quality gate, exposure limits — needed before real money) OR keep the paper
+track running monthly (score id=1 once ~a month elapses). See §7.**
 
 ---
 
