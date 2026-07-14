@@ -30,6 +30,25 @@ MIN_MCAP_CR = 2000.0      # ₹2000 cr market-cap floor ≈ liquid (Nifty-500-is
 REPORT_LAG_DAYS = 90
 TOP_QUANTILE = 5          # rank threshold for the signal
 MAX_HOLDINGS = 25         # concentration cap so a ~₹1L book is actually tradeable
+TREND_MA_DAYS = 200       # Tier-1.2 trend overlay: equal-weight index vs its 200d MA
+
+
+def _market_regime(px: pd.DataFrame, t: pd.Timestamp, ma_days: int = TREND_MA_DAYS) -> dict:
+    """Tier-1.2 trend / tail-risk overlay. Build the equal-weight universe daily
+    index up to t and compare its level to its `ma_days` moving average. Below the
+    MA => risk-off => de-risk the book to cash (target_exposure 0). This turned a
+    -38% max drawdown into ~-19% in the backtest (docs/tier1_upgrades_results.md).
+    Uses only information available at t (no look-ahead)."""
+    dret = px.loc[:t].pct_change().clip(-0.20, 0.20)
+    idx = (1 + dret.mean(axis=1, skipna=True).fillna(0)).cumprod()
+    if len(idx) < ma_days:
+        return {"risk_on": True, "target_exposure": 1.0, "index_level": None,
+                "index_ma": None, "ma_days": ma_days, "note": "insufficient history"}
+    level = float(idx.iloc[-1])
+    ma = float(idx.rolling(ma_days, min_periods=max(100, ma_days // 2)).mean().iloc[-1])
+    risk_on = level >= ma
+    return {"risk_on": bool(risk_on), "target_exposure": 1.0 if risk_on else 0.0,
+            "index_level": round(level, 4), "index_ma": round(ma, 4), "ma_days": ma_days}
 
 
 def _z(s: pd.Series) -> pd.Series:
@@ -104,7 +123,12 @@ def compute_portfolio(as_of: date | None = None) -> dict:
 
     n_top = min(max(int(len(comp) / TOP_QUANTILE), 1), MAX_HOLDINGS)
     top = comp.sort_values(ascending=False).head(n_top)
-    weight = round(1.0 / len(top), 6)
+
+    # Tier-1.2 trend overlay: scale the whole book by target_exposure (0 = flat/cash)
+    regime = _market_regime(px_t, t)
+    exposure = regime["target_exposure"]
+    weight = round(exposure / len(top), 6)      # per-name weight after de-risking
+    cash_weight = round(1.0 - exposure, 6)      # 1.0 when risk-off (book in cash)
 
     holdings = []
     for sym, z in top.items():
@@ -122,16 +146,45 @@ def compute_portfolio(as_of: date | None = None) -> dict:
         "universe_size": int(len(comp)),
         "n_holdings": len(holdings),
         "holdings": holdings,
+        "regime": regime,
+        "target_exposure": exposure,
+        "cash_weight": cash_weight,
         "params": {"min_mcap_cr": MIN_MCAP_CR, "min_price": MIN_PRICE, "top_quantile": TOP_QUANTILE,
                    "max_holdings": MAX_HOLDINGS, "report_lag_days": REPORT_LAG_DAYS,
+                   "trend_ma_days": TREND_MA_DAYS,
                    "factors": ["momentum_12_1", "value_ey", "value_pb"]},
     }
 
 
-def record_portfolio(pf: dict, notional: float = 100_000.0, live_prices: dict | None = None) -> int | None:
+def existing_portfolio_for(as_of_date: str, strategy: str = STRATEGY) -> int | None:
+    """Return the id of any already-recorded book for this (as_of_date, strategy),
+    regardless of model_version. The paper track must hold ONE book per formation
+    date; a code change bumps model_version and would otherwise let a same-day
+    duplicate slip past the DB uniqueness constraint (which includes model_version)."""
+    eng = create_engine(BHARAT_URL)
+    try:
+        with eng.begin() as conn:
+            row = conn.execute(text(
+                "SELECT id FROM paper_portfolio WHERE as_of_date=:d AND strategy=:s ORDER BY id LIMIT 1"),
+                {"d": as_of_date, "s": strategy}).fetchone()
+    finally:
+        eng.dispose()
+    return row[0] if row else None
+
+
+def record_portfolio(pf: dict, notional: float = 100_000.0, live_prices: dict | None = None,
+                     force: bool = False) -> int | None:
     """Append the portfolio to paper_portfolio. If live_prices {symbol: ltp} is
     given (e.g. from Kite), it overrides the Dawn close as the entry price.
-    Returns the new id, or None if already recorded (idempotent)."""
+    Returns the new id, or None if already recorded (idempotent).
+
+    A book for the same as_of_date already existing (under any model_version) blocks
+    the insert and returns None unless force=True, so re-running the monthly job
+    after a code change cannot silently double-count a formation date."""
+    if not force:
+        dup = existing_portfolio_for(pf["as_of"], pf["strategy"])
+        if dup is not None:
+            return None
     holdings = [dict(h) for h in pf["holdings"]]
     if live_prices:
         for h in holdings:
@@ -179,18 +232,31 @@ def score_portfolio(portfolio_id: int, exit_prices: dict, exit_date: str,
             if not pf:
                 return None
             holdings = pf[0] if isinstance(pf[0], list) else json.loads(pf[0])
-            rets, hp = [], []
+            # weight-aware: respect stored per-name weights (Tier-1.2 de-risking scales
+            # them by exposure; the 1-sum(weights) remainder sits in cash at 0% return).
+            # Legacy equal-weight books (weights sum ~1) reduce to the simple mean.
+            rets, hp, w_scored, wr = [], [], 0.0, 0.0
             for h in holdings:
                 ep, xp = h.get("entry_price"), exit_prices.get(h["symbol"])
+                w = float(h.get("weight", 0.0) or 0.0)
                 if ep and xp:
                     r = (xp - ep) / ep * 100
                     rets.append(r)
-                    hp.append({"symbol": h["symbol"], "entry": ep, "exit": xp, "ret_pct": round(r, 2)})
+                    w_scored += w
+                    wr += w * r
+                    hp.append({"symbol": h["symbol"], "entry": ep, "exit": xp,
+                               "ret_pct": round(r, 2), "weight": round(w, 6)})
             if not rets:
                 return None
             import statistics
-            gross = statistics.fmean(rets)
-            net = gross - cost_pct
+            exposure = sum(float(h.get("weight", 0.0) or 0.0) for h in holdings)
+            if w_scored > 0 and exposure > 0:
+                # renormalise over names we could actually price, then re-apply exposure
+                # so the cash sleeve (incl. de-risking) correctly contributes 0%.
+                gross = (wr / w_scored) * exposure
+            else:
+                gross = statistics.fmean(rets)   # legacy fallback (no usable weights)
+            net = gross - cost_pct * exposure     # only the invested sleeve pays cost
             excess = (gross - benchmark_return_pct) if benchmark_return_pct is not None else None
             conn.execute(text("""
                 INSERT INTO paper_portfolio_pnl

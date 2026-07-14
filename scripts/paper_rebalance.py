@@ -34,7 +34,9 @@ def main() -> None:
     ap.add_argument("--score", type=int, default=None, help="score this portfolio_id instead of forming one")
     ap.add_argument("--exit-prices", default=None, help="JSON file {symbol: ltp} of exit prices")
     ap.add_argument("--exit-date", default=None)
-    ap.add_argument("--benchmark", type=float, default=None, help="benchmark return % over the period")
+    ap.add_argument("--benchmark", type=float, default=None, help="benchmark return pct over the period")
+    ap.add_argument("--force", action="store_true",
+                    help="record even if a book for this as_of_date already exists (default: refuse)")
     args = ap.parse_args()
 
     if args.score:
@@ -45,11 +47,23 @@ def main() -> None:
 
     live = json.loads(Path(args.live_prices).read_text()) if args.live_prices else None
     pf = papertrack.compute_portfolio(args.as_of)
-    pid = papertrack.record_portfolio(pf, notional=args.notional, live_prices=live)
-    print(f"as_of={pf['as_of']} universe={pf['universe_size']} holdings={pf['n_holdings']} "
-          f"-> paper_portfolio id={pid if pid else '(already recorded)'}")
+    existing = papertrack.existing_portfolio_for(pf["as_of"], pf["strategy"])
+    pid = papertrack.record_portfolio(pf, notional=args.notional, live_prices=live, force=args.force)
+    reg = pf["regime"]
+    state = "RISK-ON (fully invested)" if reg["risk_on"] else "RISK-OFF → DE-RISK TO CASH"
+    if pid:
+        tag = f"paper_portfolio id={pid}"
+    else:
+        tag = f"NOT recorded — book id={existing} already exists for {pf['as_of']} (use --force to override)"
+    print(f"as_of={pf['as_of']} universe={pf['universe_size']} holdings={pf['n_holdings']} -> {tag}")
+    print(f"trend overlay [{reg['ma_days']}d MA]: index {reg['index_level']} vs MA {reg['index_ma']} "
+          f"-> {state}  (target_exposure={pf['target_exposure']:.0%})")
+    if not reg["risk_on"]:
+        print("  ⚠ book de-risked: names below are the intended holdings when the trend turns"
+              " back up; hold cash until then.")
     for h in pf["holdings"]:
-        print(f"  {h['symbol']:<13} z={h['composite_z']:>6.2f} entry=₹{h['entry_price']:>8.1f}")
+        print(f"  {h['symbol']:<13} z={h['composite_z']:>6.2f} entry=₹{h['entry_price']:>8.1f}"
+              f"  w={h['weight']:.3f}")
 
 
 if __name__ == "__main__":
