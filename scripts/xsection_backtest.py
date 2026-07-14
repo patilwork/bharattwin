@@ -166,9 +166,14 @@ def main() -> None:
     for i in range(len(rebal) - 1):
         t, t1 = rebal[i], rebal[i + 1]
         yr = t.year
-        price_t = pxm.loc[t]
+        # Survivorship fix: only names that actually TRADED within 15d of t are in
+        # the universe (drop long-dead/ffilled names). A name that delists mid-hold
+        # realises its loss to the last traded price via the ffilled fwd lookup.
+        livewin = px.loc[t - pd.Timedelta(days=15):t]
+        live = livewin.columns[livewin.notna().any()]
+        price_t = pxm.loc[t].reindex(live)
         liquid = price_t[price_t >= MIN_PRICE].index
-        fwd = (pxm.loc[t1] / pxm.loc[t] - 1.0).clip(*FWD_WINSOR).reindex(liquid)
+        fwd = (pxm.loc[t1].reindex(liquid) / pxm.loc[t].reindex(liquid) - 1.0).clip(*FWD_WINSOR)
 
         win = px.loc[:t]
         mom = win.iloc[-252:-21].apply(lambda c: c.dropna().iloc[-1] / c.dropna().iloc[0] - 1 if c.dropna().shape[0] > 200 else np.nan) if len(win) > 260 else pd.Series(dtype=float)
