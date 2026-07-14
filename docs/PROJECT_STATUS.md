@@ -15,7 +15,14 @@ Realistic edge: **~4-6%/yr alpha over a liquid-equity benchmark, Sharpe ~0.9,
 25-40% drawdowns** — good, not get-rich. No real money until the paper track
 confirms (~2-3 months). Automation is built ~60%.
 
-**Immediate next task (user-chosen): build TIER 1 upgrades (§7).**
+**TIER 1 upgrades DONE (2026-07-14, §7 + docs/tier1_upgrades_results.md).**
+One real upgrade found: a **market-MA trend overlay** that cuts max drawdown
+-38%→-19% (Sharpe 1.19→1.40) — wire into papertrack/kill-switch. 12-1 spec
+confirmed optimal (FIP/12-2 rejected). CPCV: 100% OOS paths Sharpe>0, PBO 29%
+(strongest robustness yet). Low-vol/low-beta benched (regime flip directional only).
+
+**Immediate next task: wire the trend overlay into papertrack + pick TIER 2 vs
+automation Phase A (§7).**
 
 ---
 
@@ -137,13 +144,20 @@ excess (7 days = pure noise, machinery-proof only).
 
 ## 7. ROADMAP / OPEN ITEMS (do in this order)
 
-### TIER 1 — free, now, price-based (← NEXT TASK the user approved)
-- [ ] **12-2 momentum + Frog-in-the-Pan path-quality** (canon's preferred spec vs our 12-1)
-- [ ] **Trend/tail-risk overlay (GVMT)** — moving-average de-risk to cut -30% drawdowns
-- [ ] **Combinatorial Purged CV** (Lopez de Prado) — stronger than our permutation test
-- [ ] **Low-vol/low-beta REGIME conditioning** — test if low-vol's negative t flips
-      positive in bear/high-vol regimes (validates the Frazzini-Pedersen reconciliation
-      → potential regime-switched 3rd diversifier)
+### TIER 1 — DONE 2026-07-14 (docs/tier1_upgrades_results.md; scripts/tier1_*.py)
+- [x] **12-2 / Frog-in-the-Pan** — REJECT. 12-1 already optimal (IC_t 4.04 vs 3.98);
+      FIP blend dilutes (IC_t 0.57); path-split spread only +2.6pp. Keep 12-1.
+- [x] **Trend/tail-risk overlay** — ADOPT. Market equal-weight index vs 200d MA →
+      de-risk to cash when below. maxDD -37.6%→-19.4%, worst mo -26%→-10%,
+      Sharpe 1.19→1.40, Calmar 0.75→1.19, for ~5pp/yr given up. Stock own-MA
+      filter alone barely helps — the market switch is the whole win.
+      **→ NEXT: wire into papertrack + Phase B kill-switch.**
+- [x] **Combinatorial Purged CV** — PASS. 28 purged paths (N=8,k=2, 1mo embargo):
+      core Sharpe>0 on 100% of paths, OOS mean 1.30, 5th-pctile 0.28; PBO=29%
+      (<50%). IS-winner always a momentum variant. Strongest robustness evidence yet.
+- [x] **Low-vol/low-beta regime** — BENCH. FP effect directional only (defensive
+      LS spread halves in bear: -1.51%→-0.66%) but IC never turns +ve/significant.
+      Trend overlay is the better defensive tool. Revisit with a longer bear sample.
 
 ### MORNINGSTAR MCP — tested 2026-07-14 (partial unblock for LIVE overlay only)
 Morningstar MCP (server 03b08385-...) covers Indian NSE+BSE stocks. Tested:
