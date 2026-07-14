@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>JARVIS · BharatTwin</title>
+<style>
+  :root{
+    --bg:#05080d; --panel:rgba(10,20,30,.55); --line:rgba(0,229,255,.18);
+    --cyan:#22d3ee; --cyan-dim:#0e7490; --ink:#cdeefc; --ink-dim:#5c7d8f;
+    --green:#2ee6a6; --red:#ff4d6d; --amber:#ffb020; --glow:0 0 14px rgba(34,211,238,.5);
+    --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
+  body{
+    background:
+      radial-gradient(1200px 700px at 50% -10%,rgba(34,211,238,.10),transparent 60%),
+      radial-gradient(900px 600px at 100% 110%,rgba(46,230,166,.06),transparent 55%),
+      var(--bg);
+    color:var(--ink); font-family:var(--mono); overflow-x:hidden;
+    background-attachment:fixed;
+  }
+  /* animated grid + scanline */
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background-image:linear-gradient(var(--line) 1px,transparent 1px),
+                     linear-gradient(90deg,var(--line) 1px,transparent 1px);
+    background-size:44px 44px; mask:radial-gradient(1000px 700px at 50% 30%,#000 30%,transparent 80%);
+    opacity:.35}
+  body::after{content:"";position:fixed;left:0;right:0;height:120px;z-index:1;pointer-events:none;
+    background:linear-gradient(transparent,rgba(34,211,238,.06),transparent);
+    animation:scan 7s linear infinite}
+  @keyframes scan{0%{top:-120px}100%{top:100%}}
+  .wrap{position:relative;z-index:2;max-width:1320px;margin:0 auto;padding:18px 20px 40px}
+
+  header{display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+    border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:16px}
+  .brand{font-weight:700;letter-spacing:.34em;font-size:15px;color:#fff;text-shadow:var(--glow)}
+  .brand small{color:var(--cyan);letter-spacing:.28em}
+  .spacer{flex:1}
+  .pill{border:1px solid var(--line);border-radius:999px;padding:5px 12px;font-size:11px;
+    letter-spacing:.14em;color:var(--ink-dim);display:flex;align-items:center;gap:7px;text-transform:uppercase}
+  .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green)}
+  .dot.live{animation:blink 1.4s ease-in-out infinite}
+  @keyframes blink{50%{opacity:.25}}
+  .clock{font-size:12px;letter-spacing:.2em;color:var(--cyan)}
+
+  .grid{display:grid;grid-template-columns:1fr 1.35fr 1fr;gap:16px}
+  @media(max-width:980px){.grid{grid-template-columns:1fr}}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 16px 14px;
+    backdrop-filter:blur(3px);position:relative;overflow:hidden}
+  .panel::before,.panel::after{content:"";position:absolute;width:14px;height:14px;border:2px solid var(--cyan);opacity:.5}
+  .panel::before{left:7px;top:7px;border-right:0;border-bottom:0}
+  .panel::after{right:7px;bottom:7px;border-left:0;border-top:0}
+  .ptitle{font-size:11px;letter-spacing:.28em;color:var(--cyan);text-transform:uppercase;margin:0 0 12px;
+    display:flex;align-items:center;gap:8px}
+  .ptitle .bar{flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent)}
+
+  /* vitals */
+  .vrow{display:flex;justify-content:space-between;align-items:baseline;padding:7px 0;border-bottom:1px dashed rgba(92,125,143,.18)}
+  .vrow:last-child{border-bottom:0}
+  .vlabel{font-size:11px;color:var(--ink-dim);letter-spacing:.08em}
+  .vval{font-size:15px;color:#fff}
+  .vval .up{color:var(--green)} .vval .arrow{color:var(--cyan);margin:0 6px}
+  .muted{color:var(--ink-dim)}
+
+  /* regime orb */
+  .orbwrap{display:flex;flex-direction:column;align-items:center;gap:6px;padding:6px 0 4px}
+  .ring{--exp:1;width:210px;height:210px;border-radius:50%;display:grid;place-items:center;position:relative;
+    background:conic-gradient(var(--rc,var(--cyan)) calc(var(--exp)*360deg),rgba(255,255,255,.05) 0);
+    box-shadow:0 0 40px rgba(34,211,238,.25),inset 0 0 40px rgba(0,0,0,.6);
+    animation:spin 24s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .ring::before{content:"";position:absolute;inset:12px;border-radius:50%;background:var(--bg);
+    box-shadow:inset 0 0 30px rgba(34,211,238,.15)}
+  .core{position:relative;z-index:2;text-align:center;animation:spin 24s linear infinite reverse}
+  .core .state{font-size:22px;font-weight:700;letter-spacing:.12em;text-shadow:var(--glow)}
+  .core .sub{font-size:10px;letter-spacing:.24em;color:var(--ink-dim);margin-top:4px}
+  .exp{font-size:34px;font-weight:700;color:#fff}
+  .regmeta{display:flex;gap:18px;justify-content:center;font-size:11px;color:var(--ink-dim);letter-spacing:.1em;margin-top:8px}
+  .regmeta b{color:var(--ink);font-weight:600}
+
+  /* pnl */
+  .pnl{display:flex;align-items:baseline;gap:12px;margin-top:6px}
+  .pnl .big{font-size:30px;font-weight:700}
+  .pos{color:var(--green)} .neg{color:var(--red)} .flat{color:var(--ink-dim)}
+
+  /* quality */
+  .qbadge{font-size:30px;font-weight:700;color:#fff}
+  .flagchip{display:inline-block;margin:3px 4px 0 0;padding:3px 9px;border-radius:6px;font-size:11px;
+    border:1px solid rgba(255,176,32,.4);color:var(--amber);background:rgba(255,176,32,.07);letter-spacing:.06em}
+
+  /* holdings */
+  .holds{margin-top:16px}
+  .hgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:9px}
+  .chip{border:1px solid var(--line);border-radius:10px;padding:9px 10px;background:rgba(8,16,24,.5);position:relative}
+  .chip.flag{border-color:rgba(255,176,32,.45)}
+  .chip .sym{font-size:12px;letter-spacing:.06em;color:#fff;display:flex;justify-content:space-between;align-items:center}
+  .chip .warn{color:var(--amber);font-size:12px}
+  .chip .ret{font-size:16px;font-weight:700;margin-top:3px}
+  .chip .px{font-size:10px;color:var(--ink-dim);margin-top:2px;letter-spacing:.04em}
+  .chip .qbar{height:3px;border-radius:2px;margin-top:7px;background:rgba(255,255,255,.06);overflow:hidden}
+  .chip .qbar i{display:block;height:100%;background:var(--cyan)}
+
+  footer{margin-top:18px;border-top:1px solid var(--line);padding-top:10px;font-size:11px;color:var(--ink-dim);
+    display:flex;gap:18px;flex-wrap:wrap;letter-spacing:.08em}
+  .booting{text-align:center;color:var(--cyan);letter-spacing:.3em;padding:60px;font-size:13px;animation:blink 1.4s infinite}
+  .disclaim{color:var(--ink-dim);opacity:.8}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">J.A.R.V.I.S <small>// BHARATTWIN</small></div>
+    <div class="pill"><span class="dot live" id="statusDot"></span><span id="statusTxt">connecting</span></div>
+    <div class="pill" id="freshPill">DATA · —</div>
+    <div class="spacer"></div>
+    <div class="pill" id="verPill">BUILD · —</div>
+    <div class="clock" id="clock">--:--:-- UTC</div>
+  </header>
+
+  <div id="boot" class="booting">◇ INITIALISING SUPER-QUANT CORE ◇</div>
+
+  <main id="main" style="display:none">
+  <div class="grid">
+    <!-- VITALS -->
+    <section class="panel">
+      <div class="ptitle">Strategy Vitals <span class="bar"></span></div>
+      <div class="vrow"><span class="vlabel">Sharpe (base → overlay)</span>
+        <span class="vval"><span id="vShB"></span><span class="arrow">▸</span><span class="up" id="vShO"></span></span></div>
+      <div class="vrow"><span class="vlabel">Max drawdown</span>
+        <span class="vval"><span id="vddB"></span><span class="arrow">▸</span><span class="up" id="vddO"></span></span></div>
+      <div class="vrow"><span class="vlabel">Deflated Sharpe</span><span class="vval" id="vDSR"></span></div>
+      <div class="vrow"><span class="vlabel">CPCV OOS paths &gt; 0</span><span class="vval up" id="vCPCV"></span></div>
+      <div class="vrow"><span class="vlabel">PBO (overfit prob)</span><span class="vval" id="vPBO"></span></div>
+      <div class="vrow"><span class="vlabel">Momentum IC t-stat</span><span class="vval" id="vIC"></span></div>
+      <div class="vrow"><span class="vlabel">Permutation p</span><span class="vval" id="vP"></span></div>
+      <div class="vrow"><span class="vlabel">Est. alpha / yr</span><span class="vval" id="vAlpha"></span></div>
+    </section>
+
+    <!-- REGIME + PNL -->
+    <section class="panel">
+      <div class="ptitle">Trend Regime · Tier-1.2 Overlay <span class="bar"></span></div>
+      <div class="orbwrap">
+        <div class="ring" id="ring">
+          <div class="core">
+            <div class="exp" id="expPct">—</div>
+            <div class="state" id="regState">—</div>
+            <div class="sub">TARGET EXPOSURE</div>
+          </div>
+        </div>
+        <div class="regmeta">
+          <span>INDEX <b id="idxLvl">—</b></span>
+          <span>200d MA <b id="idxMa">—</b></span>
+          <span>Δ <b id="idxDelta">—</b></span>
+        </div>
+      </div>
+      <div class="ptitle" style="margin-top:14px">Paper Book · Mark-to-Market <span class="bar"></span></div>
+      <div class="pnl"><span class="big" id="portRet">—</span><span class="muted" id="portMeta"></span></div>
+      <div class="regmeta" style="justify-content:flex-start;margin-top:8px">
+        <span>BOOK <b id="bookId">—</b></span><span>FORMED <b id="bookAsof">—</b></span>
+        <span>NOTIONAL <b id="bookNot">—</b></span><span>MARKS <b id="markSrc">—</b></span>
+      </div>
+    </section>
+
+    <!-- QUALITY -->
+    <section class="panel">
+      <div class="ptitle">Quality / Forensic · Tier-2 <span class="bar"></span></div>
+      <div class="pnl"><span class="qbadge" id="qFlagged">—</span><span class="muted">of <span id="qCov">—</span> picks flagged</span></div>
+      <div id="qList" style="margin-top:12px"></div>
+      <div class="disclaim" style="margin-top:14px;font-size:10.5px;line-height:1.5">
+        Live current-snapshot screen (1 annual quarter, no history) — advisory, not a backtested factor.
+      </div>
+    </section>
+  </div>
+
+  <!-- HOLDINGS -->
+  <section class="panel holds">
+    <div class="ptitle">Holdings · <span id="hCount">—</span> names <span class="bar"></span>
+      <span class="muted" style="letter-spacing:.1em">sorted by return</span></div>
+    <div class="hgrid" id="hgrid"></div>
+  </section>
+
+  <footer>
+    <span id="fResearch"></span>
+    <span class="spacer"></span>
+    <span class="disclaim">PAPER ONLY · read-only · no live orders placed by the system</span>
+  </footer>
+  </main>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmt = (v,d=2,s='') => (v===null||v===undefined||Number.isNaN(v)) ? '—' : (v>0&&s==='+'?'+':'')+v.toFixed(d);
+const clsRet = v => v===null||v===undefined ? 'flat' : (v>0.0001?'pos':(v<-0.0001?'neg':'flat'));
+
+function tickClock(){
+  const d=new Date();
+  $('clock').textContent = d.toISOString().slice(11,19)+' UTC';
+}
+setInterval(tickClock,1000); tickClock();
+
+function render(s){
+  if(s.status==='booting'||(!s.regime&&!s.error)){return;}
+  $('boot').style.display='none'; $('main').style.display='';
+
+  // status
+  const online = s.status==='online';
+  $('statusDot').style.background = online?'var(--green)':'var(--red)';
+  $('statusDot').style.boxShadow = '0 0 8px '+(online?'var(--green)':'var(--red)');
+  $('statusTxt').textContent = (online?'online':'degraded')+(s.age_sec!=null?' · '+s.age_sec+'s ago':'');
+  $('verPill').textContent = 'BUILD · '+(s.model_version||'—');
+
+  const f=s.data_freshness||{};
+  $('freshPill').textContent = 'DATA · '+(f.latest_price_date||'—')+(f.stale_days!=null?' ('+f.stale_days+'d)':'');
+  $('freshPill').style.color = f.is_stale?'var(--amber)':'var(--ink-dim)';
+
+  // vitals
+  const v=s.vitals||{};
+  $('vShB').textContent=fmt(v.sharpe_base); $('vShO').textContent=fmt(v.sharpe_overlay);
+  $('vddB').textContent=fmt(v.maxdd_base,1)+'%'; $('vddO').textContent=fmt(v.maxdd_overlay,1)+'%';
+  $('vDSR').textContent=fmt(v.deflated_sharpe); $('vCPCV').textContent=v.cpcv_oos_positive_pct+'%';
+  $('vPBO').textContent=v.pbo_pct+'%'; $('vIC').textContent=fmt(v.ic_t_momentum);
+  $('vP').textContent=v.permutation_p; $('vAlpha').textContent=fmt(v.alpha_est_lo,0)+'–'+fmt(v.alpha_est_hi,0)+'%';
+
+  // regime
+  const r=s.regime||{}; const on=r.risk_on;
+  const exp=(s.signal&&s.signal.target_exposure!=null)?s.signal.target_exposure:(on?1:0);
+  const ring=$('ring');
+  ring.style.setProperty('--exp',exp);
+  ring.style.setProperty('--rc', on?'var(--green)':'var(--red)');
+  $('expPct').textContent=Math.round(exp*100)+'%';
+  $('regState').textContent = on?'RISK-ON':'RISK-OFF';
+  $('regState').style.color = on?'var(--green)':'var(--red)';
+  $('idxLvl').textContent=fmt(r.index_level,3); $('idxMa').textContent=fmt(r.index_ma,3);
+  const delta = (r.index_level!=null&&r.index_ma!=null)?(r.index_level-r.index_ma):null;
+  $('idxDelta').textContent=fmt(delta,3,'+'); $('idxDelta').style.color = delta>=0?'var(--green)':'var(--red)';
+
+  // pnl
+  const m=s.mtm||{};
+  const pr=m.port_ret_pct;
+  const el=$('portRet'); el.textContent = pr==null?'AWAITING MARKS':fmt(pr,2,'+')+'%';
+  el.className='big '+clsRet(pr);
+  $('portMeta').textContent = m.n_marked!=null? (m.n_marked+' marked · '+(m.mark_source==='live_ltp'?'LIVE LTP':'EOD close')) : '';
+  const b=s.book||{};
+  $('bookId').textContent = b.id!=null?('#'+b.id):'—'; $('bookAsof').textContent=b.as_of||'—';
+  $('bookNot').textContent = b.notional?('₹'+(b.notional/100000).toFixed(1)+'L'):'—';
+  $('markSrc').textContent = m.mark_source==='live_ltp'?'LIVE':'EOD';
+
+  // quality
+  const q=s.quality_summary||{};
+  $('qFlagged').textContent=q.n_flagged!=null?q.n_flagged:'—';
+  $('qCov').textContent=q.n_covered!=null?q.n_covered:'—';
+  $('qList').innerHTML=(q.flagged||[]).map(x=>'<span class="flagchip">⚠ '+x+'</span>').join('') || '<span class="muted">no red flags on current picks</span>';
+
+  // holdings
+  const names=(m.names||[]);
+  $('hCount').textContent=names.length;
+  $('hgrid').innerHTML = names.map(n=>{
+    const c=clsRet(n.ret_pct); const flagged=(n.flags&&n.flags.length);
+    const qs=n.q_score; const qw = qs==null?0:Math.max(2,Math.min(100,(qs+2)/4*100));
+    const qcol = qs==null?'var(--ink-dim)':(qs>=0?'var(--cyan)':'var(--amber)');
+    return `<div class="chip ${flagged?'flag':''}" title="${(n.flags||[]).join(' · ')}">
+      <div class="sym">${n.symbol}${flagged?'<span class="warn">⚠</span>':''}</div>
+      <div class="ret ${c}">${n.ret_pct==null?'·':fmt(n.ret_pct,2,'+')+'%'}</div>
+      <div class="px">${n.entry?('₹'+n.entry.toFixed(1)):'—'} → ${n.mark?('₹'+n.mark.toFixed(1)):'—'}</div>
+      <div class="qbar"><i style="width:${qw}%;background:${qcol}"></i></div>
+    </div>`;
+  }).join('');
+
+  $('fResearch').textContent = 'EDGE: momentum(12-1)+value · IC_t '+fmt(v.ic_t_momentum)+' · overlay Sharpe '+fmt(v.sharpe_overlay)+' · '+v.cpcv_oos_positive_pct+'% OOS positive';
+}
+
+async function poll(){
+  try{
+    const res=await fetch('/api/state',{cache:'no-store'});
+    const s=await res.json();
+    render(s);
+  }catch(e){
+    $('statusTxt').textContent='link lost'; $('statusDot').style.background='var(--red)';
+  }
+}
+poll(); setInterval(poll,5000);
+</script>
+</body>
+</html>

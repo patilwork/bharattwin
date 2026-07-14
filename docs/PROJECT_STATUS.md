@@ -26,6 +26,11 @@ confirms (~2-3 months). Automation is built ~60%.
 - **TIER 2 live quality/forensic overlay** — deep-fundamental snapshot screen,
   9/25 live picks flagged; `--quality` in orchestrator. (src/quality.py)
 - 44 tests pass.
+- **JARVIS live HUD** — `scripts/jarvis_server.py` (+ `jarvis_dashboard.html`,
+  `.claude/launch.json`, docs/jarvis_dashboard.md). Localhost dashboard over the
+  real state (regime orb, vitals, book MTM, quality flags, holdings). Reuses the
+  orchestrator dry-run; optional live marks via `logs/live_ltp.json`. Read-only.
+  Run: `.venv/bin/python scripts/jarvis_server.py` → http://localhost:7842
 
 **Immediate next task options: Phase B (kill-switch/monitoring: drawdown halt,
 data-quality gate, exposure limits — needed before real money) OR keep the paper
