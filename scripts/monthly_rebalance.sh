@@ -38,6 +38,12 @@ echo "============================================"
 echo "BharatTwin Phase A monthly rebalance — $(date)"
 echo "============================================"
 
+# Step 0: refresh the Dawn price panel from NSE bhavcopy so the signal is current
+# (turns the data-freshness "gate" into a real fetch). Non-fatal if it fails —
+# the orchestrator still runs and flags staleness.
+echo "Refreshing Dawn price panel ..."
+"$PY" scripts/refresh_dawn_prices.py || echo "WARN: price refresh failed; continuing on existing panel"
+
 # --dry-run by default is NOT used here: the scheduled job records the paper book.
 # To preview without writing, run manually with --dry-run.
 # Live Kite LTPs (optional): if scripts fetched them to these files, pass them through.

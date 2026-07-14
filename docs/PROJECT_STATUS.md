@@ -44,6 +44,13 @@ confirms (~2-3 months). Automation is built ~60%.
 - **Live Kite marks** — today's (07-14) closes for all 34 held names in
   `logs/live_ltp.json` (gitignored). First 11 days (live): Core -0.08%, Trend -0.08%
   (≡ Core, overlay not triggered), Quality -0.21% (gate cost ~13bps so far — noise).
+- **Dawn price refresh built** (`scripts/refresh_dawn_prices.py`) — pulls NSE UDiFF
+  bhavcopy (1 zip/day, all EQ/BE), upserts into stock_prices_daily. Ran it: Dawn now
+  ends **2026-07-14 (0d stale)**; refreshed closes match Kite LTP exactly. The SIGNAL
+  now advances to today (fresh 07-14 signal drifts only 2/25 names from the held book).
+  Wired as step-0 of `monthly_rebalance.sh` (the data "gate" is now a real fetch).
+  NSE reachable from this box (HTTP 200). Parser unit-tested. CAVEAT: raw closes;
+  corporate actions inside the refresh window not auto-adjusted (rare, short window).
 - **JARVIS HUD is multi-book** — book-switcher tabs + compare strip; marks show LIVE.
   Kite re-auth via the `login` tool when the session expires (user clicks the URL).
 
