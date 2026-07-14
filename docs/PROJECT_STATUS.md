@@ -145,6 +145,20 @@ excess (7 days = pure noise, machinery-proof only).
       positive in bear/high-vol regimes (validates the Frazzini-Pedersen reconciliation
       → potential regime-switched 3rd diversifier)
 
+### MORNINGSTAR MCP — tested 2026-07-14 (partial unblock for LIVE overlay only)
+Morningstar MCP (server 03b08385-...) covers Indian NSE+BSE stocks. Tested:
+- WORKS: ROIC-TTM `STA4Z` (Reliance 6.79%), Quantitative Fair Value `QV009` (₹1278),
+  moat/star-rating (already used by BharatTwin). Packaged metrics resolve.
+- FAILS: raw line items (revenue EQX1P, net income EQVHZ, gross profit EQ46Q, EBITDA
+  margin EQB5T) ERROR; and NO time-series history returns (latest snapshot only,
+  date-range calls all error).
+- VERDICT: usable as a LIVE current-snapshot quality/value OVERLAY on the 25-stock
+  book (ROIC + fair-value + moat gate → "cheap-AND-good" screen, free, no paid data).
+  NOT a historical-backtest source (Tier 3 still needs Prowess/Capitaline). Forensic/
+  governance events NOT in Morningstar (still need NSE announcements).
+- ACTIONABLE NOW: add a Morningstar ROIC+fair-value quality gate to papertrack's
+  live picks (per-stock id-lookup + data-tool, ~25 calls/month, flaky so retry).
+
 ### TIER 2 — fetch run (Dawn's fetcher), RECENT quarters only (~2025-26)
 - [ ] Backfill deep fundamentals via `calc/fetchers.py fetch_all_integrated_filings`
       (NSE Integrated Filing, Dec-2024+ only) → enables as LIVE OVERLAYS (not deep backtest):
