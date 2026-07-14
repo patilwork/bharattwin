@@ -173,14 +173,21 @@ Morningstar MCP (server 03b08385-...) covers Indian NSE+BSE stocks. Tested:
 - ACTIONABLE NOW: add a Morningstar ROIC+fair-value quality gate to papertrack's
   live picks (per-stock id-lookup + data-tool, ~25 calls/month, flaky so retry).
 
-### TIER 2 — fetch run (Dawn's fetcher), RECENT quarters only (~2025-26)
-- [ ] Backfill deep fundamentals via `calc/fetchers.py fetch_all_integrated_filings`
-      (NSE Integrated Filing, Dec-2024+ only) → enables as LIVE OVERLAYS (not deep backtest):
-- [ ] **Quality factor** (ROIC, gross-profitability, Piotroski, Sloan accruals)
-- [ ] **EBIT/EV + FCF-yield value** (upgrade from P/B — canon-preferred)
-- [ ] **Forensic accounting** (CFO/PAT divergence, Beneish M-score)
-- [ ] **Governance events** via `fetch_announcements` + keyword/LLM extraction
-      (auditor/CFO resignations, qualified opinions)
+### TIER 2 — LIVE quality/forensic overlay DONE 2026-07-14 (docs/tier2_quality_overlay_results.md)
+- [x] **Quality/forensic overlay built** — `src/quality.py` + orchestrator `--quality`.
+      Uses the deep fields ALREADY in Dawn (revenue/pat/op_profit/cfo/assets/debt/
+      net_worth). KEY DATA FACT: deep fields are ~ONE annual snapshot (period_end
+      2026-03-31, ~1083 names) — NO history — so this is a LIVE current-snapshot
+      screen, NOT a backtested factor. Computes quality z-score (ROA, op-profitability,
+      ROIC, −accruals, CFO/PAT) + forensic red flags (PAT>rev, negative net worth,
+      negative/weak CFO, high leverage) with Financial-Services suppression (via
+      security_sector.nse_industry). On the live 25-book: 9/25 flagged (RAYMOND
+      PAT>rev+CFO/PAT=0.01, IDEA/DIACABS/GMR negative net worth, etc). Advisory,
+      not auto-drop. 44 tests pass.
+- [ ] Still TODO (need the NSE Integrated-Filing fetch for RECENT quarters, or paid
+      history for backtest): EBIT/EV + FCF-yield value upgrade; Beneish M-score;
+      governance events (auditor/CFO resignations) via fetch_announcements + LLM.
+      The wall is DATA HISTORY, not method (§6).
 
 ### TIER 3 — needs PAID data / heavy scrape (decision required)
 - [ ] Full-history (2021-2024) deep fundamentals → Prowess/CMIE or Capitaline

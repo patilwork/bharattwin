@@ -137,8 +137,11 @@ def build_order_tickets(prev_holdings: list[dict], new_holdings: list[dict],
 
 def run_monthly(as_of: str | None = None, notional: float = 100_000.0,
                 live_prices: dict | None = None, exit_prices: dict | None = None,
-                benchmark_pct: float | None = None, dry_run: bool = False) -> dict:
-    """Execute the full monthly cycle and return a structured report. PAPER ONLY."""
+                benchmark_pct: float | None = None, dry_run: bool = False,
+                with_quality: bool = False) -> dict:
+    """Execute the full monthly cycle and return a structured report. PAPER ONLY.
+    with_quality adds the Tier-2 deep-fundamental quality/forensic annotation on
+    the picks (advisory — surfaces accounting red flags, does not auto-drop)."""
     report: dict = {"run_ts": datetime.now(timezone.utc).isoformat(), "dry_run": dry_run,
                     "model_version": papertrack.ledger.git_commit()}
 
@@ -151,6 +154,11 @@ def run_monthly(as_of: str | None = None, notional: float = 100_000.0,
     report["signal"] = {"as_of": pf["as_of"], "universe_size": pf["universe_size"],
                         "n_holdings": pf["n_holdings"], "regime": pf["regime"],
                         "target_exposure": pf["target_exposure"]}
+
+    # Tier-2 quality/forensic overlay (advisory annotation on the picks)
+    if with_quality:
+        from src import quality
+        report["quality"] = quality.annotate([h["symbol"] for h in pf["holdings"]], pf["as_of"])
 
     # 2. score the last elapsed, unscored book (against exit_prices or Dawn close)
     prev = latest_unscored_portfolio(before_as_of=pf["as_of"])

@@ -36,13 +36,15 @@ def main() -> None:
     ap.add_argument("--exit-prices", default=None, help="JSON {symbol: ltp} to score prior book")
     ap.add_argument("--benchmark", type=float, default=None, help="benchmark return pct")
     ap.add_argument("--dry-run", action="store_true", help="no DB writes")
+    ap.add_argument("--quality", action="store_true",
+                    help="add Tier-2 deep-fundamental quality/forensic screen on the picks")
     ap.add_argument("--json", action="store_true", help="print raw JSON report")
     args = ap.parse_args()
 
     rep = orchestrator.run_monthly(
         as_of=args.as_of, notional=args.notional,
         live_prices=_load(args.live_prices), exit_prices=_load(args.exit_prices),
-        benchmark_pct=args.benchmark, dry_run=args.dry_run,
+        benchmark_pct=args.benchmark, dry_run=args.dry_run, with_quality=args.quality,
     )
 
     if args.json:
@@ -86,6 +88,20 @@ def main() -> None:
         val = f"₹{t['target_value']:,.0f}" if t["action"] != "SELL" else "—"
         print(f"   {t['action']:<9} {t['symbol']:<13} w {t['prev_weight']:.3f}->{t['target_weight']:.3f} "
               f"@ {px:>10}  target {val}")
+
+    if "quality" in rep:
+        q = rep["quality"]
+        print(f"3b. QUALITY/FORENSIC SCREEN (Tier-2, advisory): {q['n_covered']}/{q['n_covered']+q['n_missing']} "
+              f"with deep data, {q['n_flagged']} flagged")
+        for sym, v in sorted(q["by_symbol"].items(), key=lambda kv: (kv[1].get("quality_score") is None,
+                                                                     kv[1].get("quality_score") or 0)):
+            if v.get("no_data"):
+                print(f"   {sym:<13} (no deep data)")
+                continue
+            qs = f"{v['quality_score']:+.2f}" if v["quality_score"] is not None else " n/a"
+            fin = "FIN " if v["financial"] else "    "
+            flags = ("  ⚠ " + "; ".join(v["red_flags"])) if v["red_flags"] else ""
+            print(f"   {sym:<13} {fin}q={qs} rank={v.get('quality_rank_pct')}{flags}")
 
     rec = rep["recorded"]
     if rec.get("dry_run"):
