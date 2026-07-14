@@ -38,8 +38,31 @@ def main() -> None:
     ap.add_argument("--dry-run", action="store_true", help="no DB writes")
     ap.add_argument("--quality", action="store_true",
                     help="add Tier-2 deep-fundamental quality/forensic screen on the picks")
+    ap.add_argument("--all", action="store_true",
+                    help="run the full pre-registered book set (Core + Trend + Quality)")
     ap.add_argument("--json", action="store_true", help="print raw JSON report")
     args = ap.parse_args()
+
+    if args.all:
+        combined = orchestrator.run_all_variants(
+            as_of=args.as_of, notional=args.notional, dry_run=args.dry_run, with_quality=True)
+        if args.json:
+            print(json.dumps(combined, indent=2, default=str)); return
+        r = combined["regime"]
+        state = "RISK-ON" if r["risk_on"] else "RISK-OFF → CASH"
+        print("=" * 72)
+        print(f"PHASE A · ALL BOOKS{'  [DRY RUN]' if combined['dry_run'] else ''}  —  {combined['run_ts'][:19]}Z")
+        print(f"regime [{r['ma_days']}d]: index {r['index_level']} vs MA {r['index_ma']} -> {state}")
+        print("=" * 72)
+        for rep in combined["variants"]:
+            v = rep["variant"]; sig = rep["signal"]; rec = rep["recorded"]
+            g = sig.get("quality_gate", {})
+            rid = rec.get("portfolio_id") or f"exists id={rec.get('existing') or rec.get('existing_blocked')}"
+            gate = f" | gate dropped {g['n_dropped']}" if g.get("applied") else ""
+            print(f"  {v['label']:<14}{'★' if v['primary'] else ' '} exposure {sig['target_exposure']:.0%} "
+                  f"holdings {sig['n_holdings']}{gate} -> {rid}")
+        print("PAPER ONLY. Core is the pre-registered primary; Trend/Quality are attribution satellites.")
+        return
 
     rep = orchestrator.run_monthly(
         as_of=args.as_of, notional=args.notional,

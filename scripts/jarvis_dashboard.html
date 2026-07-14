@@ -106,6 +106,14 @@
     display:flex;gap:18px;flex-wrap:wrap;letter-spacing:.08em}
   .booting{text-align:center;color:var(--cyan);letter-spacing:.3em;padding:60px;font-size:13px;animation:blink 1.4s infinite}
   .disclaim{color:var(--ink-dim);opacity:.8}
+  /* book tabs */
+  .btab{border:1px solid var(--line);border-radius:8px;padding:6px 13px;font-size:12px;letter-spacing:.1em;
+    color:var(--ink-dim);cursor:pointer;background:rgba(8,16,24,.4);transition:.15s;text-transform:uppercase;display:flex;align-items:center;gap:6px}
+  .btab:hover{color:var(--ink);border-color:var(--cyan)}
+  .btab.active{color:#fff;border-color:var(--cyan);box-shadow:var(--glow);background:rgba(34,211,238,.08)}
+  .btab .star{color:var(--amber);font-size:11px}
+  .cmp{font-size:11px;letter-spacing:.08em;color:var(--ink-dim);display:flex;flex-direction:column;align-items:flex-end}
+  .cmp b{font-size:14px}
 </style>
 </head>
 <body>
@@ -122,6 +130,16 @@
   <div id="boot" class="booting">◇ INITIALISING SUPER-QUANT CORE ◇</div>
 
   <main id="main" style="display:none">
+  <!-- BOOK SWITCHER + COMPARE STRIP -->
+  <section class="panel" style="margin-bottom:16px;padding:12px 16px">
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span class="ptitle" style="margin:0">Books <span class="bar" style="width:20px"></span></span>
+      <div id="bookTabs" style="display:flex;gap:8px;flex-wrap:wrap"></div>
+      <div class="spacer" style="flex:1"></div>
+      <div id="compareStrip" style="display:flex;gap:16px;flex-wrap:wrap"></div>
+    </div>
+  </section>
+
   <div class="grid">
     <!-- VITALS -->
     <section class="panel">
@@ -194,28 +212,21 @@ const $ = id => document.getElementById(id);
 const fmt = (v,d=2,s='') => (v===null||v===undefined||Number.isNaN(v)) ? '—' : (v>0&&s==='+'?'+':'')+v.toFixed(d);
 const clsRet = v => v===null||v===undefined ? 'flat' : (v>0.0001?'pos':(v<-0.0001?'neg':'flat'));
 
-function tickClock(){
-  const d=new Date();
-  $('clock').textContent = d.toISOString().slice(11,19)+' UTC';
-}
+let STATE=null, activeIdx=0;
+
+function tickClock(){ $('clock').textContent = new Date().toISOString().slice(11,19)+' UTC'; }
 setInterval(tickClock,1000); tickClock();
 
-function render(s){
-  if(s.status==='booting'||(!s.regime&&!s.error)){return;}
-  $('boot').style.display='none'; $('main').style.display='';
-
-  // status
+function renderShared(s){
   const online = s.status==='online';
   $('statusDot').style.background = online?'var(--green)':'var(--red)';
   $('statusDot').style.boxShadow = '0 0 8px '+(online?'var(--green)':'var(--red)');
   $('statusTxt').textContent = (online?'online':'degraded')+(s.age_sec!=null?' · '+s.age_sec+'s ago':'');
   $('verPill').textContent = 'BUILD · '+(s.model_version||'—');
-
   const f=s.data_freshness||{};
   $('freshPill').textContent = 'DATA · '+(f.latest_price_date||'—')+(f.stale_days!=null?' ('+f.stale_days+'d)':'');
   $('freshPill').style.color = f.is_stale?'var(--amber)':'var(--ink-dim)';
 
-  // vitals
   const v=s.vitals||{};
   $('vShB').textContent=fmt(v.sharpe_base); $('vShO').textContent=fmt(v.sharpe_overlay);
   $('vddB').textContent=fmt(v.maxdd_base,1)+'%'; $('vddO').textContent=fmt(v.maxdd_overlay,1)+'%';
@@ -223,9 +234,7 @@ function render(s){
   $('vPBO').textContent=v.pbo_pct+'%'; $('vIC').textContent=fmt(v.ic_t_momentum);
   $('vP').textContent=v.permutation_p; $('vAlpha').textContent=fmt(v.alpha_est_lo,0)+'–'+fmt(v.alpha_est_hi,0)+'%';
 
-  // regime
-  const r=s.regime||{}; const on=r.risk_on;
-  const exp=(s.signal&&s.signal.target_exposure!=null)?s.signal.target_exposure:(on?1:0);
+  const r=s.regime||{}; const on=r.risk_on; const exp=on?1:0;
   const ring=$('ring');
   ring.style.setProperty('--exp',exp);
   ring.style.setProperty('--rc', on?'var(--green)':'var(--red)');
@@ -235,47 +244,71 @@ function render(s){
   $('idxLvl').textContent=fmt(r.index_level,3); $('idxMa').textContent=fmt(r.index_ma,3);
   const delta = (r.index_level!=null&&r.index_ma!=null)?(r.index_level-r.index_ma):null;
   $('idxDelta').textContent=fmt(delta,3,'+'); $('idxDelta').style.color = delta>=0?'var(--green)':'var(--red)';
+  $('fResearch').textContent = 'EDGE: momentum(12-1)+value · IC_t '+fmt(v.ic_t_momentum)+' · overlay Sharpe '+fmt(v.sharpe_overlay)+' · '+v.cpcv_oos_positive_pct+'% OOS positive';
 
-  // pnl
-  const m=s.mtm||{};
+  // book tabs + compare strip
+  const books=s.books||[];
+  $('bookTabs').innerHTML = books.map((b,i)=>
+    `<div class="btab ${i===activeIdx?'active':''}" onclick="selectBook(${i})">${b.label}${b.primary?'<span class="star">★</span>':''}</div>`
+  ).join('');
+  $('compareStrip').innerHTML = books.map(b=>{
+    const pr=b.mtm&&b.mtm.port_ret_pct; const c=clsRet(pr);
+    return `<div class="cmp">${b.label.toUpperCase()}<b class="${c}">${pr==null?'—':fmt(pr,2,'+')+'%'}</b></div>`;
+  }).join('');
+}
+
+function renderBook(s){
+  const books=s.books||[];
+  if(!books.length) return;
+  if(activeIdx>=books.length) activeIdx=0;
+  const b=books[activeIdx]; const m=b.mtm||{};
+
   const pr=m.port_ret_pct;
   const el=$('portRet'); el.textContent = pr==null?'AWAITING MARKS':fmt(pr,2,'+')+'%';
   el.className='big '+clsRet(pr);
-  $('portMeta').textContent = m.n_marked!=null? (m.n_marked+' marked · '+(m.mark_source==='live_ltp'?'LIVE LTP':'EOD close')) : '';
-  const b=s.book||{};
-  $('bookId').textContent = b.id!=null?('#'+b.id):'—'; $('bookAsof').textContent=b.as_of||'—';
+  const gate = b.quality_gate ? ' · quality-gated' : (b.overlay ? ' · trend overlay' : ' · core');
+  $('portMeta').textContent = (m.n_marked!=null? (m.n_marked+' marked · '+(m.mark_source==='live_ltp'?'LIVE LTP':'EOD close')) : '')+gate;
+  $('bookId').textContent = b.id!=null?('#'+b.id):'—';
+  $('bookAsof').textContent = (b.as_of||'—')+(b.created&&b.created!==b.as_of?(' → entered '+b.created):'');
   $('bookNot').textContent = b.notional?('₹'+(b.notional/100000).toFixed(1)+'L'):'—';
   $('markSrc').textContent = m.mark_source==='live_ltp'?'LIVE':'EOD';
 
-  // quality
-  const q=s.quality_summary||{};
-  $('qFlagged').textContent=q.n_flagged!=null?q.n_flagged:'—';
-  $('qCov').textContent=q.n_covered!=null?q.n_covered:'—';
-  $('qList').innerHTML=(q.flagged||[]).map(x=>'<span class="flagchip">⚠ '+x+'</span>').join('') || '<span class="muted">no red flags on current picks</span>';
+  // quality (this book)
+  const names=(m.names||[]);
+  const flagged=names.filter(n=>n.flags&&n.flags.length);
+  $('qFlagged').textContent=m.n_flagged!=null?m.n_flagged:flagged.length;
+  $('qCov').textContent=names.length;
+  $('qList').innerHTML=flagged.map(n=>'<span class="flagchip">⚠ '+n.symbol+'</span>').join('')
+    || '<span class="muted">no red flags in this book</span>';
 
   // holdings
-  const names=(m.names||[]);
   $('hCount').textContent=names.length;
   $('hgrid').innerHTML = names.map(n=>{
-    const c=clsRet(n.ret_pct); const flagged=(n.flags&&n.flags.length);
+    const c=clsRet(n.ret_pct); const fl=(n.flags&&n.flags.length);
     const qs=n.q_score; const qw = qs==null?0:Math.max(2,Math.min(100,(qs+2)/4*100));
     const qcol = qs==null?'var(--ink-dim)':(qs>=0?'var(--cyan)':'var(--amber)');
-    return `<div class="chip ${flagged?'flag':''}" title="${(n.flags||[]).join(' · ')}">
-      <div class="sym">${n.symbol}${flagged?'<span class="warn">⚠</span>':''}</div>
+    return `<div class="chip ${fl?'flag':''}" title="${(n.flags||[]).join(' · ')}">
+      <div class="sym">${n.symbol}${fl?'<span class="warn">⚠</span>':''}</div>
       <div class="ret ${c}">${n.ret_pct==null?'·':fmt(n.ret_pct,2,'+')+'%'}</div>
       <div class="px">${n.entry?('₹'+n.entry.toFixed(1)):'—'} → ${n.mark?('₹'+n.mark.toFixed(1)):'—'}</div>
       <div class="qbar"><i style="width:${qw}%;background:${qcol}"></i></div>
     </div>`;
   }).join('');
+}
 
-  $('fResearch').textContent = 'EDGE: momentum(12-1)+value · IC_t '+fmt(v.ic_t_momentum)+' · overlay Sharpe '+fmt(v.sharpe_overlay)+' · '+v.cpcv_oos_positive_pct+'% OOS positive';
+function selectBook(i){ activeIdx=i; if(STATE){ renderShared(STATE); renderBook(STATE); } }
+
+function render(s){
+  if(!s.regime&&!s.error){return;}
+  STATE=s;
+  $('boot').style.display='none'; $('main').style.display='';
+  renderShared(s); renderBook(s);
 }
 
 async function poll(){
   try{
     const res=await fetch('/api/state',{cache:'no-store'});
-    const s=await res.json();
-    render(s);
+    render(await res.json());
   }catch(e){
     $('statusTxt').textContent='link lost'; $('statusDot').style.background='var(--red)';
   }

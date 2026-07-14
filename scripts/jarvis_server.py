@@ -72,26 +72,33 @@ def _latest_closes(symbols: list[str]) -> dict:
     return {r[0]: {"close": float(r[1]), "date": str(r[2])} for r in rows}
 
 
-def _held_book() -> dict | None:
+def _held_book(strategy: str | None = None) -> dict | None:
+    conds = []
+    params: dict = {}
+    if strategy:
+        conds.append("strategy = :s"); params["s"] = strategy
+    where = ("WHERE " + " AND ".join(conds)) if conds else ""
     eng = create_engine(BHARAT_URL)
     try:
         with eng.connect() as conn:
-            row = conn.execute(text("""
-                SELECT id, as_of_date, notional, holdings FROM paper_portfolio
+            row = conn.execute(text(f"""
+                SELECT id, as_of_date, notional, holdings, strategy, created_ts FROM paper_portfolio
+                {where}
                 ORDER BY as_of_date DESC, id DESC LIMIT 1
-            """)).fetchone()
+            """), params).fetchone()
     finally:
         eng.dispose()
     if not row:
         return None
     holdings = row[3] if isinstance(row[3], list) else json.loads(row[3])
-    return {"id": row[0], "as_of": str(row[1]), "notional": float(row[2] or 0), "holdings": holdings}
+    return {"id": row[0], "as_of": str(row[1]), "notional": float(row[2] or 0),
+            "holdings": holdings, "strategy": row[4], "created": str(row[5])[:10]}
 
 
-def _mark_to_market(book: dict, quality: dict | None) -> dict:
-    """Per-name and portfolio return, entry -> live LTP (if provided) or latest close."""
-    live = {}
-    src = "entry"
+def _mark_to_market(book: dict, qlookup: dict) -> dict:
+    """Per-name and portfolio return, entry -> live LTP (if provided) or latest close.
+    qlookup: {symbol: {"quality_score":.., "red_flags":[..]}} for flag annotation."""
+    live, src = {}, "entry"
     if LIVE_LTP_PATH.exists():
         try:
             live = {k.upper(): float(v) for k, v in json.loads(LIVE_LTP_PATH.read_text()).items() if v}
@@ -100,9 +107,8 @@ def _mark_to_market(book: dict, quality: dict | None) -> dict:
             live = {}
     syms = [h["symbol"] for h in book["holdings"]]
     closes = _latest_closes(syms)
-    q_by = (quality or {}).get("by_symbol", {})
 
-    names, rets = [], []
+    names, rets, n_flagged = [], [], 0
     for h in book["holdings"]:
         s = h["symbol"]
         entry = h.get("entry_price")
@@ -110,34 +116,61 @@ def _mark_to_market(book: dict, quality: dict | None) -> dict:
         ret = ((mark - entry) / entry * 100) if (entry and mark) else None
         if ret is not None:
             rets.append(ret * float(h.get("weight", 0) or (1.0 / len(book["holdings"]))))
-        qf = q_by.get(s, {})
+        qf = qlookup.get(s, {})
+        flags = qf.get("red_flags", [])
+        if flags:
+            n_flagged += 1
         names.append({
             "symbol": s, "entry": entry, "mark": mark, "ret_pct": ret,
             "weight": h.get("weight"), "mark_date": closes.get(s, {}).get("date"),
-            "q_score": qf.get("quality_score"), "flags": qf.get("red_flags", []),
+            "q_score": qf.get("quality_score"), "flags": flags,
         })
     port_ret = sum(rets) if rets else None
     names_sorted = sorted(names, key=lambda n: (n["ret_pct"] is None, -(n["ret_pct"] or 0)))
     return {"mark_source": src, "port_ret_pct": port_ret, "n_marked": len(rets),
-            "names": names_sorted}
+            "n_flagged": n_flagged, "names": names_sorted}
 
 
 def build_snapshot() -> dict:
-    """Assemble the full live state from the tested modules (orchestrator dry-run)."""
-    rep = orchestrator.run_monthly(dry_run=True, with_quality=True)
-    book = _held_book()
-    mtm = _mark_to_market(book, rep.get("quality")) if book else None
+    """Assemble the full live state: shared regime/freshness + every recorded book
+    variant (Core / Trend / Quality) with its own mark-to-market and forensic flags."""
+    from src import quality
+    fresh = orchestrator.data_freshness()
+    # regime + as_of computed once (Core signal); reused across books
+    core_pf = papertrack.compute_portfolio()
+    regime, as_of = core_pf["regime"], core_pf["as_of"]
+    qdf = quality.load_quality(as_of)
+    qlookup = {}
+    if not qdf.empty:
+        for sym, r in qdf.iterrows():
+            import pandas as pd
+            qlookup[sym] = {
+                "quality_score": None if pd.isna(r["quality_score"]) else round(float(r["quality_score"]), 3),
+                "red_flags": list(r["red_flags"]),
+            }
+
+    books = []
+    for v in papertrack.VARIANTS:
+        hb = _held_book(v["strategy"])
+        if not hb:
+            continue
+        mtm = _mark_to_market(hb, qlookup)
+        books.append({
+            "strategy": v["strategy"], "label": v["label"], "primary": v["primary"],
+            "overlay": v["overlay"], "quality_gate": v["quality_gate"],
+            "id": hb["id"], "as_of": hb["as_of"], "created": hb["created"],
+            "notional": hb["notional"], "n_holdings": len(hb["holdings"]),
+            "mtm": mtm,
+        })
+
     return {
         "server_ts": datetime.now(timezone.utc).isoformat(),
-        "model_version": rep.get("model_version"),
-        "data_freshness": rep.get("data_freshness"),
-        "regime": rep["signal"]["regime"],
-        "signal": {k: rep["signal"][k] for k in ("as_of", "universe_size", "n_holdings", "target_exposure")},
-        "quality_summary": {"n_flagged": rep.get("quality", {}).get("n_flagged"),
-                            "n_covered": rep.get("quality", {}).get("n_covered"),
-                            "flagged": rep.get("quality", {}).get("flagged", [])},
-        "book": {"id": book["id"], "as_of": book["as_of"], "notional": book["notional"]} if book else None,
-        "mtm": mtm,
+        "model_version": papertrack.ledger.git_commit(),
+        "data_freshness": fresh,
+        "regime": regime,
+        "as_of": as_of,
+        "universe_size": core_pf["universe_size"],
+        "books": books,
         "vitals": VITALS,
     }
 

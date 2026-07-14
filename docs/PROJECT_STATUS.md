@@ -32,9 +32,23 @@ confirms (~2-3 months). Automation is built ~60%.
   orchestrator dry-run; optional live marks via `logs/live_ltp.json`. Read-only.
   Run: `.venv/bin/python scripts/jarvis_server.py` → http://localhost:7842
 
+**ALSO DONE 2026-07-14:**
+- **Multi-book paper track** (docs/multi_book_design.md) — 3 pre-registered books:
+  Core (id=1, primary, since 07-03), Trend overlay (id=4), Quality gate (id=5, drops
+  the 9 forensically-flagged names). Each satellite differs from Core by one knob.
+  `compute_portfolio(overlay=, quality_gate=, strategy=)`; `orchestrator.run_all_variants`;
+  `scripts/orchestrate_monthly.py --all`. Discipline: Core is primary, never reallocate
+  to the live leader (guards the PBO/DSR work). 47 tests pass.
+- **Live Kite marks** — pulled today's (07-14) closes for all 34 held names into
+  `logs/live_ltp.json` (gitignored). Trend/Quality entered at today's live prices
+  (P&L starts ~0, not backdated). Core's live 11-day MTM ≈ -0.08%.
+- **JARVIS HUD is multi-book** — book-switcher tabs + compare strip; marks show LIVE.
+  Kite re-auth via the `login` tool when the session expires (user clicks the URL).
+
 **Immediate next task options: Phase B (kill-switch/monitoring: drawdown halt,
-data-quality gate, exposure limits — needed before real money) OR keep the paper
-track running monthly (score id=1 once ~a month elapses). See §7.**
+data-quality gate, exposure limits — needed before real money); OR a Kite-based
+Dawn refresh so the SIGNAL advances past 07-03 (fixes the 11-day staleness); OR
+keep the paper track running monthly (`--all`, score once ~a month elapses). See §7.**
 
 ---
 

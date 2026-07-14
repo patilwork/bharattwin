@@ -24,13 +24,26 @@ from src import ledger  # reuse git_commit()
 DAWN_URL = os.environ.get("DAWN_URL", "postgresql://localhost:5432/dawn")
 BHARAT_URL = os.environ.get("DATABASE_URL", "postgresql://localhost:5432/bharattwin")
 
-STRATEGY = "momentum_value_composite_v1"
+STRATEGY = "momentum_value_composite_v1"          # Core (primary), fully invested, ungated
+STRATEGY_TREND = "momentum_value_trend_v1"        # Core + Tier-1.2 trend overlay
+STRATEGY_QUALITY = "momentum_value_quality_v1"    # Core + Tier-2 forensic gate
 MIN_PRICE = 10.0
 MIN_MCAP_CR = 2000.0      # ₹2000 cr market-cap floor ≈ liquid (Nifty-500-ish)
 REPORT_LAG_DAYS = 90
 TOP_QUANTILE = 5          # rank threshold for the signal
 MAX_HOLDINGS = 25         # concentration cap so a ~₹1L book is actually tradeable
 TREND_MA_DAYS = 200       # Tier-1.2 trend overlay: equal-weight index vs its 200d MA
+
+# The pre-registered book set. Core is PRIMARY — the clean out-of-sample proof of
+# the validated edge. Trend and Quality are single-variable attribution satellites
+# (each differs from Core by exactly one thing). Do NOT reallocate capital to the
+# live leader — these measure the *marginal* value of each overlay, they do not
+# compete. Correlated by construction (shared momentum+value core).
+VARIANTS = [
+    {"strategy": STRATEGY,         "label": "Core",          "overlay": False, "quality_gate": False, "primary": True},
+    {"strategy": STRATEGY_TREND,   "label": "Trend overlay", "overlay": True,  "quality_gate": False, "primary": False},
+    {"strategy": STRATEGY_QUALITY, "label": "Quality gate",  "overlay": False, "quality_gate": True,  "primary": False},
+]
 
 
 def _market_regime(px: pd.DataFrame, t: pd.Timestamp, ma_days: int = TREND_MA_DAYS) -> dict:
@@ -68,9 +81,16 @@ def _adjust_prices(px: pd.DataFrame, ca: pd.DataFrame) -> pd.DataFrame:
     return adj
 
 
-def compute_portfolio(as_of: date | None = None) -> dict:
+def compute_portfolio(as_of: date | None = None, overlay: bool = False,
+                      quality_gate: bool = False, strategy: str | None = None) -> dict:
     """Form the composite top-quintile long-only portfolio as of `as_of`
-    (default: latest available Dawn date)."""
+    (default: latest available Dawn date).
+
+    overlay=True applies the Tier-1.2 trend de-risk (scale book to cash below MA).
+    quality_gate=True drops Tier-2 forensically-flagged names from the candidate
+    pool before selecting the top quintile. strategy names the book (default Core).
+    The regime is always computed and reported (informational when overlay=False)."""
+    strategy = strategy or STRATEGY
     eng = create_engine(DAWN_URL)
     px = pd.read_sql(text("SELECT symbol,date,close FROM stock_prices_daily WHERE symbol IS NOT NULL AND close>0"), eng)
     px["date"] = pd.to_datetime(px["date"])
@@ -121,12 +141,25 @@ def compute_portfolio(as_of: date | None = None) -> dict:
     if comp.empty:
         raise RuntimeError("no names passed the universe/factor filter")
 
+    # Tier-2 quality gate: drop forensically-flagged names from the candidate pool
+    gate = {"applied": quality_gate, "dropped": [], "n_dropped": 0}
+    if quality_gate:
+        from src import quality
+        q = quality.load_quality(t.date().isoformat())
+        flagged = set(q.index[q["red_flags"].map(len) > 0]) if not q.empty else set()
+        dropped = [s for s in comp.index if s in flagged]
+        comp = comp.drop(index=dropped)
+        gate.update(dropped=dropped, n_dropped=len(dropped))
+        if comp.empty:
+            raise RuntimeError("quality gate removed the entire candidate pool")
+
     n_top = min(max(int(len(comp) / TOP_QUANTILE), 1), MAX_HOLDINGS)
     top = comp.sort_values(ascending=False).head(n_top)
 
-    # Tier-1.2 trend overlay: scale the whole book by target_exposure (0 = flat/cash)
+    # Tier-1.2 trend overlay: scale the whole book by target_exposure (0 = flat/cash).
+    # Regime is always computed; exposure only bites when overlay=True.
     regime = _market_regime(px_t, t)
-    exposure = regime["target_exposure"]
+    exposure = regime["target_exposure"] if overlay else 1.0
     weight = round(exposure / len(top), 6)      # per-name weight after de-risking
     cash_weight = round(1.0 - exposure, 6)      # 1.0 when risk-off (book in cash)
 
@@ -142,16 +175,18 @@ def compute_portfolio(as_of: date | None = None) -> dict:
 
     return {
         "as_of": t.date().isoformat(),
-        "strategy": STRATEGY,
+        "strategy": strategy,
         "universe_size": int(len(comp)),
         "n_holdings": len(holdings),
         "holdings": holdings,
         "regime": regime,
+        "overlay": overlay,
+        "quality_gate": gate,
         "target_exposure": exposure,
         "cash_weight": cash_weight,
         "params": {"min_mcap_cr": MIN_MCAP_CR, "min_price": MIN_PRICE, "top_quantile": TOP_QUANTILE,
                    "max_holdings": MAX_HOLDINGS, "report_lag_days": REPORT_LAG_DAYS,
-                   "trend_ma_days": TREND_MA_DAYS,
+                   "trend_ma_days": TREND_MA_DAYS, "overlay": overlay, "quality_gate": quality_gate,
                    "factors": ["momentum_12_1", "value_ey", "value_pb"]},
     }
 

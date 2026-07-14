@@ -26,3 +26,6 @@ venv/
 Thumbs.db
 .ipynb_checkpoints/
 pgdata/
+
+# runtime logs & live market marks (ephemeral)
+logs/

@@ -65,22 +65,29 @@ def data_freshness(as_of: date | None = None) -> dict:
     }
 
 
-def latest_unscored_portfolio(before_as_of: str | None = None) -> dict | None:
-    """The most recent paper_portfolio that has no pnl row yet (and, if
-    `before_as_of` is given, was formed strictly before it). Returns id/as_of/
-    holdings or None."""
+def latest_unscored_portfolio(before_as_of: str | None = None,
+                              strategy: str | None = None) -> dict | None:
+    """The most recent paper_portfolio that has no pnl row yet (optionally filtered
+    to `strategy`, and, if `before_as_of` is given, formed strictly before it).
+    Returns id/as_of/holdings or None."""
+    conds = ["n.id IS NULL"]
+    params: dict = {}
+    if before_as_of:
+        conds.append("p.as_of_date < :b"); params["b"] = before_as_of
+    if strategy:
+        conds.append("p.strategy = :s"); params["s"] = strategy
     eng = create_engine(BHARAT_URL)
     try:
         with eng.connect() as conn:
-            q = """
+            q = f"""
                 SELECT p.id, p.as_of_date, p.holdings, p.strategy
                 FROM paper_portfolio p
                 LEFT JOIN paper_portfolio_pnl n ON n.portfolio_id = p.id
-                WHERE n.id IS NULL {before}
+                WHERE {' AND '.join(conds)}
                 ORDER BY p.as_of_date DESC, p.id DESC
                 LIMIT 1
-            """.format(before="AND p.as_of_date < :b" if before_as_of else "")
-            row = conn.execute(text(q), {"b": before_as_of} if before_as_of else {}).fetchone()
+            """
+            row = conn.execute(text(q), params).fetchone()
     finally:
         eng.dispose()
     if not row:
@@ -138,30 +145,34 @@ def build_order_tickets(prev_holdings: list[dict], new_holdings: list[dict],
 def run_monthly(as_of: str | None = None, notional: float = 100_000.0,
                 live_prices: dict | None = None, exit_prices: dict | None = None,
                 benchmark_pct: float | None = None, dry_run: bool = False,
-                with_quality: bool = False) -> dict:
-    """Execute the full monthly cycle and return a structured report. PAPER ONLY.
-    with_quality adds the Tier-2 deep-fundamental quality/forensic annotation on
-    the picks (advisory — surfaces accounting red flags, does not auto-drop)."""
+                with_quality: bool = False, variant: dict | None = None) -> dict:
+    """Execute the full monthly cycle for one book variant and return a structured
+    report. PAPER ONLY. `variant` selects overlay/quality_gate/strategy (default:
+    Core). with_quality adds the Tier-2 annotation on the picks (advisory)."""
+    variant = variant or papertrack.VARIANTS[0]
     report: dict = {"run_ts": datetime.now(timezone.utc).isoformat(), "dry_run": dry_run,
-                    "model_version": papertrack.ledger.git_commit()}
+                    "model_version": papertrack.ledger.git_commit(),
+                    "variant": {k: variant[k] for k in ("strategy", "label", "overlay",
+                                                         "quality_gate", "primary")}}
 
     # 1. data freshness gate
-    fresh = data_freshness()
-    report["data_freshness"] = fresh
+    report["data_freshness"] = data_freshness()
 
     # 3. signal (compute first so we know the new as_of for scoring boundary)
-    pf = papertrack.compute_portfolio(as_of)
+    pf = papertrack.compute_portfolio(as_of, overlay=variant["overlay"],
+                                      quality_gate=variant["quality_gate"], strategy=variant["strategy"])
     report["signal"] = {"as_of": pf["as_of"], "universe_size": pf["universe_size"],
                         "n_holdings": pf["n_holdings"], "regime": pf["regime"],
-                        "target_exposure": pf["target_exposure"]}
+                        "target_exposure": pf["target_exposure"],
+                        "quality_gate": pf["quality_gate"]}
 
     # Tier-2 quality/forensic overlay (advisory annotation on the picks)
     if with_quality:
         from src import quality
         report["quality"] = quality.annotate([h["symbol"] for h in pf["holdings"]], pf["as_of"])
 
-    # 2. score the last elapsed, unscored book (against exit_prices or Dawn close)
-    prev = latest_unscored_portfolio(before_as_of=pf["as_of"])
+    # 2. score the last elapsed, unscored book of THIS strategy
+    prev = latest_unscored_portfolio(before_as_of=pf["as_of"], strategy=variant["strategy"])
     score = None
     if prev:
         gap = (date.fromisoformat(pf["as_of"]) - date.fromisoformat(prev["as_of"])).days
@@ -175,9 +186,9 @@ def run_monthly(as_of: str | None = None, notional: float = 100_000.0,
             score = {"portfolio_id": prev["id"], "skipped": f"only {gap}d held (<{MIN_HOLD_DAYS})"}
     report["scored_prior"] = score
 
-    # 4. order tickets vs currently-held book (the latest recorded book). Diffing
-    # against a same-as_of book naturally yields HOLDs — nothing to trade.
-    held = latest_unscored_portfolio() or {"holdings": []}
+    # 4. order tickets vs the currently-held book of THIS strategy. Diffing against
+    # a same-as_of book naturally yields HOLDs — nothing to trade.
+    held = latest_unscored_portfolio(strategy=variant["strategy"]) or {"holdings": []}
     orders = build_order_tickets(held["holdings"], pf["holdings"], notional, pf["target_exposure"])
     report["held_book"] = {"id": held.get("id"), "as_of": held.get("as_of")}
     report["order_tickets"] = orders
@@ -191,6 +202,24 @@ def run_monthly(as_of: str | None = None, notional: float = 100_000.0,
         report["recorded"] = {"portfolio_id": pid, "existing_blocked": existing if pid is None else None}
 
     return report
+
+
+def run_all_variants(as_of: str | None = None, notional: float = 100_000.0,
+                     dry_run: bool = False, with_quality: bool = True) -> dict:
+    """Run the full pre-registered book set (Core + Trend + Quality) in one pass.
+    Each variant scores/records against only its own strategy. Returns a combined
+    report with a shared header. PAPER ONLY."""
+    variants = [run_monthly(as_of=as_of, notional=notional, dry_run=dry_run,
+                            with_quality=with_quality, variant=v)
+                for v in papertrack.VARIANTS]
+    return {
+        "run_ts": datetime.now(timezone.utc).isoformat(),
+        "dry_run": dry_run,
+        "model_version": papertrack.ledger.git_commit(),
+        "data_freshness": variants[0]["data_freshness"],
+        "regime": variants[0]["signal"]["regime"],
+        "variants": variants,
+    }
 
 
 def _dawn_close_prices(symbols: list[str], as_of: str) -> dict:
