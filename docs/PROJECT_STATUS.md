@@ -188,8 +188,14 @@ Morningstar MCP (server 03b08385-...) covers Indian NSE+BSE stocks. Tested:
 - [ ] Promoter pledge % (shareholding-pattern source)
 
 ### AUTOMATION (the "system that makes money")
-- [ ] **Phase A** — automated monthly orchestrator: data refresh → signal → order
-      tickets → ledger → score last month. Scheduled (cron). Still PAPER.
+- [x] **Phase A DONE (2026-07-14)** — `src/orchestrator.py` + `scripts/orchestrate_monthly.py`
+      + cron wrapper `scripts/monthly_rebalance.sh`. Sequence: data-freshness gate →
+      score last elapsed unscored book → form signal WITH trend overlay → BUY/SELL/HOLD
+      order tickets (cash on risk-off) → dup-guarded record → structured report.
+      PAPER ONLY (tickets for the user to place). `--dry-run` previews with no writes.
+      Data-refresh step is a freshness GATE, not a fetch — the real Dawn fetcher lives
+      in ~/Developer/Weekly and needs Kite Connect to automate (still a Phase-B/Tier-2
+      dependency). Tests: order-ticket diff + regime switch (36 pass total).
 - [ ] **Phase B** — kill-switch + monitoring: data-quality gate, drawdown halt,
       position/exposure limits, alerts. Before any real money.
 - [ ] **Phase C** — live execution (GATED on: paper proof ~2-3mo + Kite Connect
