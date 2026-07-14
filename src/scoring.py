@@ -23,6 +23,14 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_DB = "postgresql://bharattwin:devpassword@localhost:5434/bharattwin"
 
+# Single source of truth for the "flat" band that separates BUY/SELL from HOLD.
+# A day with |return| <= FLAT_BAND_PCT is labelled HOLD; a HOLD prediction is
+# scored correct iff the realised direction is also HOLD. Previously the label
+# used 0.25 but the HOLD-correctness check used a wider 1.0 band, which double-
+# credited BUY and HOLD on the same day and inflated HOLD accuracy.
+# Modelling choice: widen this if you consider larger daily moves still "flat".
+FLAT_BAND_PCT = 0.25
+
 
 def _get_engine():
     return create_engine(os.environ.get("DATABASE_URL", _DEFAULT_DB))
@@ -114,7 +122,7 @@ def score_date(d: date) -> dict | None:
         "t1_close": t1_close,
         "t_close": t_close,
         "actual_return_pct": actual_pct,
-        "actual_direction": "BUY" if actual_pct > 0.25 else ("SELL" if actual_pct < -0.25 else "HOLD"),
+        "actual_direction": "BUY" if actual_pct > FLAT_BAND_PCT else ("SELL" if actual_pct < -FLAT_BAND_PCT else "HOLD"),
     }
 
     if decisions:
@@ -128,10 +136,9 @@ def score_date(d: date) -> dict | None:
         score["predicted_return_pct"] = predicted_pct
         score["predicted_direction"] = predicted_dir
         score["error_pp"] = round(abs(predicted_pct - actual_pct), 4)
-        score["direction_correct"] = (
-            predicted_dir == score["actual_direction"]
-            or (predicted_dir == "HOLD" and abs(actual_pct) < 1.0)
-        )
+        # Single consistent rule: correct iff predicted direction == realised
+        # direction (HOLD is already encoded via FLAT_BAND_PCT above).
+        score["direction_correct"] = (predicted_dir == score["actual_direction"])
 
         # Per-agent scores
         agent_scores = []
@@ -146,10 +153,7 @@ def score_date(d: date) -> dict | None:
                 "predicted_pct": agent_pred,
                 "direction": agent_dir,
                 "error_pp": round(abs(agent_pred - actual_pct), 4),
-                "direction_correct": (
-                    agent_dir == score["actual_direction"]
-                    or (agent_dir == "HOLD" and abs(actual_pct) < 1.0)
-                ),
+                "direction_correct": (agent_dir == score["actual_direction"]),
             })
         score["agent_scores"] = agent_scores
     else:
@@ -158,6 +162,15 @@ def score_date(d: date) -> dict | None:
         score["error_pp"] = None
         score["direction_correct"] = None
         score["agent_scores"] = []
+
+    # Mirror the realised outcome into the append-only forecast ledger (idempotent;
+    # never overwrites a prediction, writes a separate immutable score row).
+    try:
+        from src import ledger
+        if score.get("t1_close") and score.get("t_close"):
+            ledger.record_score(d, score["t1_close"], score["t_close"], score.get("outcome_session"))
+    except Exception:
+        logger.exception("scoring: forecast_score write failed")
 
     return score
 

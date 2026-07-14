@@ -115,6 +115,21 @@ def run_pipeline(
         stored = store_results(d, result)
         summary["steps"]["store"] = f"OK — {stored} rows"
 
+        # Append to the immutable forecast ledger (falsifiable prediction spine).
+        # Records the exact input snapshot the model saw, hashed, so the score
+        # can never be contaminated by a later state rebuild.
+        try:
+            from src import ledger
+            from src.agents.llm_providers import get_provider
+
+            lid = ledger.record_forecast(
+                d, full_state, result, provider=get_provider(), model=agent_mode
+            )
+            summary["steps"]["ledger"] = f"OK — id={lid}" if lid else "OK — already recorded"
+        except Exception as exc:  # ledger must never break the pipeline
+            logger.exception("pipeline: forecast ledger write failed")
+            summary["steps"]["ledger"] = f"FAIL — {exc}"
+
     return summary
 
 

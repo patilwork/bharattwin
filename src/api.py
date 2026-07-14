@@ -20,6 +20,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import create_engine, text
 
+from src.scoring import FLAT_BAND_PCT
+
 app = FastAPI(
     title="BharatTwin API",
     description="8 AI agents predict the Indian stock market. Public scoreboard.",
@@ -150,7 +152,7 @@ def scoreboard():
 
             error = abs(consensus.avg_return_pct - actual)
             dir_pred = consensus.consensus_direction.value
-            dir_actual = "BUY" if actual > 0.25 else ("SELL" if actual < -0.25 else "HOLD")
+            dir_actual = "BUY" if actual > FLAT_BAND_PCT else ("SELL" if actual < -FLAT_BAND_PCT else "HOLD")
 
             cases.append({
                 "name": rd["name"],

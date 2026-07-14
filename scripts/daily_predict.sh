@@ -1,18 +1,40 @@
 #!/bin/bash
 # BharatTwin Daily Prediction Pipeline
-# Run at 7:00 PM IST (after market close + bhavcopy available)
+# Run on trading days (schedule to your preferred pre-market / post-close slot).
 #
-# Crontab entry:
-#   30 13 * * 1-5 /Users/abhishekpatil/Developer/niftwin/bharattwin/scripts/daily_predict.sh >> /Users/abhishekpatil/Developer/niftwin/bharattwin/logs/daily.log 2>&1
-#   (13:30 UTC = 19:00 IST)
+# Crontab (path is resolved relative to this script, so just point at it):
+#   30 2 * * 1-5 /Users/abhishekpatil/Developer/bharattwin/scripts/daily_predict.sh >> /Users/abhishekpatil/Developer/bharattwin/logs/daily.log 2>&1
+#
+# SECRETS ARE NOT STORED IN THIS FILE. Put them in <repo>/.env (gitignored):
+#   LLM_PROVIDER=sarvam
+#   SARVAM_API_KEY=...        # rotate at console.sarvam.ai — never commit
+#   DATABASE_URL=postgresql://bharattwin:devpassword@localhost:5432/bharattwin
 
-set -e
+set -euo pipefail
 
-export LLM_PROVIDER=sarvam
-export SARVAM_API_KEY=sk_02dpyejl_HG1N0ShzyBb86WLV7Bu54nNo
-export DATABASE_URL=postgresql://bharattwin:devpassword@localhost:5434/bharattwin
+# Resolve repo root relative to this script — robust to checkout location.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$REPO_ROOT"
 
-cd /Users/abhishekpatil/Developer/niftwin/bharattwin
+# Load config/secrets from .env if present (gitignored — real keys never committed).
+if [ -f "$REPO_ROOT/.env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . "$REPO_ROOT/.env"
+  set +a
+fi
+
+: "${LLM_PROVIDER:=sarvam}"
+export LLM_PROVIDER
+
+if [ -z "${SARVAM_API_KEY:-}" ] && [ -z "${ANTHROPIC_API_KEY:-}" ] && [ -z "${OPENAI_API_KEY:-}" ]; then
+  echo "ERROR: no LLM API key set (SARVAM_API_KEY / ANTHROPIC_API_KEY / OPENAI_API_KEY)." >&2
+  echo "       Add one to $REPO_ROOT/.env" >&2
+  exit 1
+fi
+
+mkdir -p "$REPO_ROOT/logs"
 
 DATE=$(python3 -c "
 from datetime import date, timedelta
