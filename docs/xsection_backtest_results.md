@@ -1,34 +1,42 @@
-# Cross-Sectional Factor Backtest — First Edge Evidence
+# Cross-Sectional Factor Backtest — Hardened (v2)
 
-Dawn panel (free primary data), 2021-06 → 2026-06, 61 monthly rebalances,
-net of 24.6bps delivery round-trip, PIT-lagged 90d, min price ₹10, quintiles.
+Dawn panel, 2021-06→2026-06, 61 monthly rebalances. Prices back-adjusted for
+splits/bonuses (210 symbols, 234 events). Net of 24.6bps delivery + 25bps impact
+proxy. PIT-lagged 90d. Composite is long-only top-quintile, turnover-costed.
 
-| Factor | mean IC | IC t | LS ann% (net) | LS Sharpe | Long-only ann% |
-|---|---|---|---|---|---|
-| momentum (12-1m) | 0.048 | 3.17 | +17.2 | 1.32 | +8.5 |
-| value_ey (E/P)   | 0.049 | 3.67 | +14.1 | 1.08 | +12.1 |
-| value_pb (1/PB)  | 0.044 | 2.49 | +17.7 | 1.27 | +10.7 |
-| low_vol          | 0.007 | 0.37 | -28.8 | -1.16 | -13.0 |
-| size             | 0.005 | 0.29 | +12.5 | 0.90 | +9.4 |
+## Single factors — IC by year (persistence test)
+| Factor | mean IC | IC t | LS ann% | per-year IC |
+|---|---|---|---|---|
+| **momentum** | 0.048 | **3.21** | +17.9 | +.075/+.007/+.092/+.020/+.048/+.068 — **positive every year** |
+| value_ey | 0.050 | 3.77 | +21.2 | positive except **2026 −0.035** |
+| value_pb | 0.044 | 2.57 | +23.4 | 2021 +0.24 (rebound), **2026 −0.048** |
+| low_vol | 0.003 | 0.17 | −34.1 | no signal |
+| size | 0.007 | 0.42 | +16.3 | no signal |
 
-**Momentum + value are statistically detectable (IC t > 2).** low_vol/size are not.
+## Long-only composite (momentum + value)
+| | ann return | Sharpe | max_dd |
+|---|---|---|---|
+| composite | +39.9% | 1.70 | −18.8% |
+| benchmark (EW universe) | +21.5% | 1.08 | |
+| **excess** | **+18.4%** | **1.48** | |
 
-## PROMISING, NOT PROVEN — the caveats that could inflate this
-1. **Survivorship bias (biggest):** delisted names largely absent → upward bias,
-   worst for value (cheap names that went to zero are missing).
-2. **Unadjusted prices:** only `close`, no split/dividend adjustment; winsorization
-   is a crude guard (adds noise to momentum — arguably conservative — but messy).
-3. **Single-regime window:** 2021-2026 was largely a mid/small-cap bull; momentum
-   and value both flatter in trending bulls. Low power for regime robustness.
-4. **No deflated Sharpe / multiple-testing correction yet** (5 factors tested).
-5. **Monthly-IC autocorrelation** may inflate the t-stats.
-6. **Liquidity/impact not modelled** — only flat delivery bps, not ADV-scaled impact;
-   the biggest premia live in illiquid names where impact bites.
-7. **Long-short is a paper construct in India** (single-stock shorting is intraday-only);
-   the tradeable version is long-only (still positive: momentum +8.5%, value +11-12%).
+- **Deflated Sharpe (composite abs): 0.821** — below the 0.95 bar
+- **Deflated Sharpe (excess vs universe): 0.755** — below the 0.95 bar
 
-## To turn promising → proven
-- corporate-action adjust prices (dawn.corporate_actions), add delisted universe
-- deflated Sharpe + purged/embargoed CV + PBO
-- ADV-scaled impact costs; long-only composite (momentum+value); turnover control
-- extend history; regime-split performance
+## Verdict: momentum robust; composite promising, NOT yet proven
+- **Momentum is the defensible signal** — IC t=3.21, positive in all 6 years,
+  survives price adjustment. This is the real candidate.
+- **Value is real but decaying** — strong historically, negative IC in 2026;
+  more survivorship-exposed (cheap names that blew up are missing).
+- **Composite economics are large (+18% excess) but DSR 0.76–0.82 < 0.95** — after
+  correcting for 5 factors tested + short sample + non-normality, we cannot yet
+  reject luck at 95%. Suggestive, not conclusive.
+- **Survivorship bias remains unquantified** and likely inflates all levels.
+
+## What proves it (turn 0.82 DSR → conviction)
+1. Add delisted universe (kills the survivorship inflation) — needs a fuller
+   historical constituent+price source than Dawn currently has.
+2. Live out-of-sample paper track via the forecast ledger (~2-3 months) — the
+   real DSR-independent test.
+3. Momentum-only sleeve first (most robust); add value as a diversifier, not core.
+4. Volume/ADV data → real impact costs (the +25bps proxy is a guess).
