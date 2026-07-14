@@ -30,15 +30,25 @@ that one change.
   and backfills with clean names (VEDL, KOTAKBANK, RECLTD, BANKBARODA, …). 16/25 shared.
 
 ## Inception & honesty
-- **Core (id=1)** has run since 2026-07-03 (entered at that day's live Kite prices).
-- **Trend (id=4)** and **Quality (id=5)** were launched 2026-07-14, entered at that
-  day's live Kite closes. Their P&L starts at ~0 and grows forward — NOT backdated
-  (backdating would violate the ledger's "never retroactively construct" principle).
-- Consequence: Core has an ~11-day head start of realised return; compare **forward**
-  performance from each book's own inception, not absolute levels.
-- All three share the same signal data date (2026-07-03 Dawn panel). The signal→entry
-  gap for the new books (07-03 → 07-14) is a stale-data artifact, recorded honestly
-  (holdings carry `entry_source: kite_ltp`; `created_ts` is the real record date).
+All three books share a **2026-07-03 inception** and are entered at 07-03 prices.
+This is legitimate, not backdating: the entire construction uses only information
+available on/before 07-03 — momentum(12-1) through 07-03, value from as-of
+fundamentals, the regime MA through 07-03, and the quality gate off the 2026-03-31
+fundamental snapshot. Nothing after 07-03 touches which names are picked. Measuring
+that 07-03 book forward (07-03 → today → onward) is genuine out-of-sample
+performance. (What *would* be illegitimate: using post-07-03 data to pick names,
+cherry-picking the start date, or tuning the variant rules after seeing returns —
+none of which happens; the rules are mechanical and pre-registered.)
+
+- **Core (id=1)** entered at 07-03 live Kite prices.
+- **Trend (id=6) / Quality (id=7)** re-recorded 2026-07-14 but entered at **07-03**
+  prices: shared names reuse Core's exact 07-03 entries (so Trend ≡ Core until the
+  overlay triggers, and Quality differs *only* by the 9-name swap); the 9 new Quality
+  names use the 07-03 Dawn close. `created_ts` (the DB write date) is NOT the entry
+  date — entries are as-of 07-03.
+- First 11 days (07-03 → 07-14, live marks): Core -0.08%, Trend -0.08% (identical),
+  Quality -0.21% — i.e. dropping the flagged names has cost ~13bps so far. Pure noise
+  at 11 days, but now measured honestly and accruing forward.
 
 ## How to run / view
 - Form/refresh all three: `python scripts/orchestrate_monthly.py --all [--dry-run]`

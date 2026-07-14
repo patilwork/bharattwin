@@ -176,7 +176,7 @@
       <div class="ptitle" style="margin-top:14px">Paper Book · Mark-to-Market <span class="bar"></span></div>
       <div class="pnl"><span class="big" id="portRet">—</span><span class="muted" id="portMeta"></span></div>
       <div class="regmeta" style="justify-content:flex-start;margin-top:8px">
-        <span>BOOK <b id="bookId">—</b></span><span>FORMED <b id="bookAsof">—</b></span>
+        <span>BOOK <b id="bookId">—</b></span><span>SINCE <b id="bookAsof">—</b></span>
         <span>NOTIONAL <b id="bookNot">—</b></span><span>MARKS <b id="markSrc">—</b></span>
       </div>
     </section>
@@ -269,7 +269,7 @@ function renderBook(s){
   const gate = b.quality_gate ? ' · quality-gated' : (b.overlay ? ' · trend overlay' : ' · core');
   $('portMeta').textContent = (m.n_marked!=null? (m.n_marked+' marked · '+(m.mark_source==='live_ltp'?'LIVE LTP':'EOD close')) : '')+gate;
   $('bookId').textContent = b.id!=null?('#'+b.id):'—';
-  $('bookAsof').textContent = (b.as_of||'—')+(b.created&&b.created!==b.as_of?(' → entered '+b.created):'');
+  $('bookAsof').textContent = b.as_of||'—';   // signal + entry date (entries are as-of prices)
   $('bookNot').textContent = b.notional?('₹'+(b.notional/100000).toFixed(1)+'L'):'—';
   $('markSrc').textContent = m.mark_source==='live_ltp'?'LIVE':'EOD';
 

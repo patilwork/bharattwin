@@ -33,15 +33,17 @@ confirms (~2-3 months). Automation is built ~60%.
   Run: `.venv/bin/python scripts/jarvis_server.py` → http://localhost:7842
 
 **ALSO DONE 2026-07-14:**
-- **Multi-book paper track** (docs/multi_book_design.md) — 3 pre-registered books:
-  Core (id=1, primary, since 07-03), Trend overlay (id=4), Quality gate (id=5, drops
-  the 9 forensically-flagged names). Each satellite differs from Core by one knob.
-  `compute_portfolio(overlay=, quality_gate=, strategy=)`; `orchestrator.run_all_variants`;
-  `scripts/orchestrate_monthly.py --all`. Discipline: Core is primary, never reallocate
-  to the live leader (guards the PBO/DSR work). 47 tests pass.
-- **Live Kite marks** — pulled today's (07-14) closes for all 34 held names into
-  `logs/live_ltp.json` (gitignored). Trend/Quality entered at today's live prices
-  (P&L starts ~0, not backdated). Core's live 11-day MTM ≈ -0.08%.
+- **Multi-book paper track** (docs/multi_book_design.md) — 3 pre-registered books,
+  ALL inception 2026-07-03: Core (id=1, primary), Trend overlay (id=6), Quality gate
+  (id=7, drops the 9 forensically-flagged names). Each satellite differs from Core by
+  ONE knob. Entered at 07-03 prices (shared names reuse Core's exact entries) — this
+  is legit, not backdating: construction is PIT ≤ 07-03, so measuring forward is real
+  OOS. `compute_portfolio(overlay=, quality_gate=, strategy=)`; `run_all_variants`;
+  `orchestrate_monthly.py --all`. Discipline: Core is primary, never reallocate to the
+  live leader. 47 tests pass.
+- **Live Kite marks** — today's (07-14) closes for all 34 held names in
+  `logs/live_ltp.json` (gitignored). First 11 days (live): Core -0.08%, Trend -0.08%
+  (≡ Core, overlay not triggered), Quality -0.21% (gate cost ~13bps so far — noise).
 - **JARVIS HUD is multi-book** — book-switcher tabs + compare strip; marks show LIVE.
   Kite re-auth via the `login` tool when the session expires (user clicks the URL).
 
