@@ -29,3 +29,4 @@ pgdata/
 
 # runtime logs & live market marks (ephemeral)
 logs/
+data/

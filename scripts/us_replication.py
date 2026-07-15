@@ -82,9 +82,11 @@ def backtest(close: pd.DataFrame, start="2016-01-31"):
 
 def stat(s, ann=False):
     s = s.dropna()
+    if len(s) < 4 or s.std() == 0:
+        return (np.nan, np.nan)
     if ann:
-        return ((1+s).prod()**(12/len(s))-1)*100, s.mean()/s.std()*np.sqrt(12) if s.std() else np.nan
-    return s.mean(), s.mean()/(s.std()/np.sqrt(len(s))) if s.std() else np.nan
+        return ((1+s).prod()**(12/len(s))-1)*100, s.mean()/s.std()*np.sqrt(12)
+    return s.mean(), s.mean()/(s.std()/np.sqrt(len(s)))
 
 
 def main():
