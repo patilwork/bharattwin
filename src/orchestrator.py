@@ -160,7 +160,9 @@ def run_monthly(as_of: str | None = None, notional: float = 100_000.0,
 
     # 3. signal (compute first so we know the new as_of for scoring boundary)
     pf = papertrack.compute_portfolio(as_of, overlay=variant["overlay"],
-                                      quality_gate=variant["quality_gate"], strategy=variant["strategy"])
+                                      quality_gate=variant["quality_gate"],
+                                      quality_tilt=variant.get("quality_tilt", False),
+                                      mcap_max=variant.get("mcap_max"), strategy=variant["strategy"])
     report["signal"] = {"as_of": pf["as_of"], "universe_size": pf["universe_size"],
                         "n_holdings": pf["n_holdings"], "regime": pf["regime"],
                         "target_exposure": pf["target_exposure"],

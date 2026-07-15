@@ -3,16 +3,20 @@
 > Added 2026-07-14. Why we now run three books instead of one, and the discipline
 > that keeps it from re-introducing overfitting.
 
-## The three books (`papertrack.VARIANTS`)
-| Book | strategy | overlay | gate | role |
-|---|---|---|---|---|
-| **Core** ★ | `momentum_value_composite_v1` | off | off | **primary** — the clean OOS proof of the validated edge |
-| Trend overlay | `momentum_value_trend_v1` | **on** | off | attribution: marginal value of the Tier-1.2 de-risk |
-| Quality gate | `momentum_value_quality_v1` | off | **on** | attribution: marginal value of the Tier-2 forensic screen |
+## The five books (`papertrack.VARIANTS`)
+| Book | strategy | the one knob | role |
+|---|---|---|---|
+| **Core** ★ | `momentum_value_composite_v1` | — (baseline) | **primary** — clean OOS proof of the validated edge |
+| Trend overlay | `momentum_value_trend_v1` | overlay on | marginal value of the Tier-1.2 de-risk |
+| Quality gate | `momentum_value_quality_v1` | forensic gate | value of the Tier-2 red-flag exclusion (a left-tail filter) |
+| Quality tilt | `momentum_value_qtilt_v1` | +quality z-leg | **live test of quality as the 3rd edge** (can't be backtested — no fundamental history) |
+| Small-cap tilt | `momentum_value_smallcap_v1` | mcap ≤ ₹8000cr | where the factor edge is strongest (efficacy, not size premium) |
 
 Each satellite differs from Core by **exactly one knob** (enforced by
 `tests/unit/test_variants_registry.py`), so any performance gap is attributable to
-that one change.
+that one change. Quality-tilt and Small-cap encode the two live experiments from
+docs/third_edge_and_cap_results.md. Capacity note: the small-cap book only makes
+sense at small AUM.
 
 ## The discipline (this matters)
 - **Core is pre-registered as primary.** We never reallocate capital to whichever

@@ -4,10 +4,15 @@ attribution). If someone adds a two-change variant, this fails loudly."""
 from src import papertrack as pt
 
 
-def test_three_variants_distinct_strategies():
+KNOBS = ["overlay", "quality_gate", "quality_tilt", "mcap_max"]
+
+
+def test_variants_distinct_strategies():
     strats = [v["strategy"] for v in pt.VARIANTS]
-    assert len(strats) == len(set(strats)) == 3
-    assert pt.STRATEGY in strats and pt.STRATEGY_TREND in strats and pt.STRATEGY_QUALITY in strats
+    assert len(strats) == len(set(strats))          # all unique
+    for s in (pt.STRATEGY, pt.STRATEGY_TREND, pt.STRATEGY_QUALITY,
+              pt.STRATEGY_QTILT, pt.STRATEGY_SMALLCAP):
+        assert s in strats
 
 
 def test_exactly_one_primary_and_it_is_core():
@@ -15,7 +20,9 @@ def test_exactly_one_primary_and_it_is_core():
     assert len(primaries) == 1
     core = primaries[0]
     assert core["strategy"] == pt.STRATEGY
-    assert core["overlay"] is False and core["quality_gate"] is False  # baseline: nothing on
+    # baseline: every knob off
+    assert not core["overlay"] and not core["quality_gate"] and not core["quality_tilt"]
+    assert core["mcap_max"] is None
 
 
 def test_satellites_differ_from_core_by_one_knob():
@@ -23,5 +30,6 @@ def test_satellites_differ_from_core_by_one_knob():
     for v in pt.VARIANTS:
         if v["primary"]:
             continue
-        diffs = sum([v["overlay"] != core["overlay"], v["quality_gate"] != core["quality_gate"]])
+        diffs = sum(bool(v[k]) != bool(core[k]) if k != "mcap_max"
+                    else (v[k] is None) != (core[k] is None) for k in KNOBS)
         assert diffs == 1, f"{v['label']} differs from Core by {diffs} knobs, must be exactly 1"

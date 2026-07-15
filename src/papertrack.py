@@ -24,9 +24,12 @@ from src import ledger  # reuse git_commit()
 DAWN_URL = os.environ.get("DAWN_URL", "postgresql://localhost:5432/dawn")
 BHARAT_URL = os.environ.get("DATABASE_URL", "postgresql://localhost:5432/bharattwin")
 
-STRATEGY = "momentum_value_composite_v1"          # Core (primary), fully invested, ungated
-STRATEGY_TREND = "momentum_value_trend_v1"        # Core + Tier-1.2 trend overlay
-STRATEGY_QUALITY = "momentum_value_quality_v1"    # Core + Tier-2 forensic gate
+STRATEGY = "momentum_value_composite_v1"            # Core (primary), fully invested, ungated
+STRATEGY_TREND = "momentum_value_trend_v1"          # Core + Tier-1.2 trend overlay
+STRATEGY_QUALITY = "momentum_value_quality_v1"      # Core + Tier-2 forensic gate
+STRATEGY_QTILT = "momentum_value_qtilt_v1"          # Core + quality-score tilt (3rd-edge test)
+STRATEGY_SMALLCAP = "momentum_value_smallcap_v1"    # Core + small-cap tilt (mcap ≤ ₹8000cr)
+SMALLCAP_MAX_CR = 8000.0
 MIN_PRICE = 10.0
 MIN_MCAP_CR = 2000.0      # ₹2000 cr market-cap floor ≈ liquid (Nifty-500-ish)
 REPORT_LAG_DAYS = 90
@@ -40,9 +43,11 @@ TREND_MA_DAYS = 200       # Tier-1.2 trend overlay: equal-weight index vs its 20
 # live leader — these measure the *marginal* value of each overlay, they do not
 # compete. Correlated by construction (shared momentum+value core).
 VARIANTS = [
-    {"strategy": STRATEGY,         "label": "Core",          "overlay": False, "quality_gate": False, "primary": True},
-    {"strategy": STRATEGY_TREND,   "label": "Trend overlay", "overlay": True,  "quality_gate": False, "primary": False},
-    {"strategy": STRATEGY_QUALITY, "label": "Quality gate",  "overlay": False, "quality_gate": True,  "primary": False},
+    {"strategy": STRATEGY,          "label": "Core",          "overlay": False, "quality_gate": False, "quality_tilt": False, "mcap_max": None,            "primary": True},
+    {"strategy": STRATEGY_TREND,    "label": "Trend overlay", "overlay": True,  "quality_gate": False, "quality_tilt": False, "mcap_max": None,            "primary": False},
+    {"strategy": STRATEGY_QUALITY,  "label": "Quality gate",  "overlay": False, "quality_gate": True,  "quality_tilt": False, "mcap_max": None,            "primary": False},
+    {"strategy": STRATEGY_QTILT,    "label": "Quality tilt",  "overlay": False, "quality_gate": False, "quality_tilt": True,  "mcap_max": None,            "primary": False},
+    {"strategy": STRATEGY_SMALLCAP, "label": "Small-cap tilt","overlay": False, "quality_gate": False, "quality_tilt": False, "mcap_max": SMALLCAP_MAX_CR, "primary": False},
 ]
 
 
@@ -82,14 +87,18 @@ def _adjust_prices(px: pd.DataFrame, ca: pd.DataFrame) -> pd.DataFrame:
 
 
 def compute_portfolio(as_of: date | None = None, overlay: bool = False,
-                      quality_gate: bool = False, strategy: str | None = None) -> dict:
+                      quality_gate: bool = False, quality_tilt: bool = False,
+                      mcap_max: float | None = None, strategy: str | None = None) -> dict:
     """Form the composite top-quintile long-only portfolio as of `as_of`
     (default: latest available Dawn date).
 
     overlay=True applies the Tier-1.2 trend de-risk (scale book to cash below MA).
-    quality_gate=True drops Tier-2 forensically-flagged names from the candidate
-    pool before selecting the top quintile. strategy names the book (default Core).
-    The regime is always computed and reported (informational when overlay=False)."""
+    quality_gate=True drops Tier-2 forensically-flagged names from the candidate pool.
+    quality_tilt=True adds the (orthogonal) quality z-score as a 4th ranking leg —
+      the live test of quality-as-third-edge (can't be backtested: no fundamental history).
+    mcap_max caps the universe market cap (₹cr) = small-cap tilt (edge is strongest in
+      smaller caps by factor efficacy; docs/third_edge_and_cap_results.md).
+    strategy names the book. The regime is always computed (informational if overlay=False)."""
     strategy = strategy or STRATEGY
     eng = create_engine(DAWN_URL)
     px = pd.read_sql(text("SELECT symbol,date,close FROM stock_prices_daily WHERE symbol IS NOT NULL AND close>0"), eng)
@@ -122,21 +131,30 @@ def compute_portfolio(as_of: date | None = None, overlay: bool = False,
     bvps, eps, shr = asof_field("bvps"), asof_field("ttm_eps"), asof_field("shares_outstanding")
     mcap_cr = (price_t * shr) / 1e7   # shares×price in ₹, ÷1e7 = ₹ crore
 
-    # liquid universe
+    # liquid universe (₹MIN_MCAP_CR floor; optional mcap_max ceiling = small-cap tilt)
     liquid = price_t[(price_t >= MIN_PRICE)].index
     liquid = mcap_cr.reindex(liquid).dropna()
-    liquid = liquid[liquid >= MIN_MCAP_CR].index
+    liquid = liquid[liquid >= MIN_MCAP_CR]
+    if mcap_max is not None:
+        liquid = liquid[liquid <= mcap_max]
+    liquid = liquid.index
 
     # factors (PIT)
     mom = px_t.iloc[-252:-21].apply(lambda c: c.dropna().iloc[-1] / c.dropna().iloc[0] - 1 if c.dropna().shape[0] > 200 else np.nan)
     value_ey = (eps.reindex(liquid) / price_t.reindex(liquid))
     value_pb = -(price_t.reindex(liquid) / bvps.reindex(liquid))
 
-    comp = pd.concat([
-        _z(mom.reindex(liquid)),
-        _z(value_ey),
-        _z(value_pb),
-    ], axis=1).mean(axis=1, skipna=True).dropna()
+    legs = [_z(mom.reindex(liquid)), _z(value_ey), _z(value_pb)]
+    factor_names = ["momentum_12_1", "value_ey", "value_pb"]
+    # Tier-2 quality TILT: add the (orthogonal) quality z-score as a 4th leg
+    if quality_tilt:
+        from src import quality
+        qdf = quality.load_quality(t.date().isoformat())
+        qz = _z(qdf["quality_score"].reindex(liquid)) if not qdf.empty else pd.Series(index=liquid, dtype=float)
+        legs.append(qz)
+        factor_names.append("quality_score")
+
+    comp = pd.concat(legs, axis=1).mean(axis=1, skipna=True).dropna()
 
     if comp.empty:
         raise RuntimeError("no names passed the universe/factor filter")
@@ -182,12 +200,15 @@ def compute_portfolio(as_of: date | None = None, overlay: bool = False,
         "regime": regime,
         "overlay": overlay,
         "quality_gate": gate,
+        "quality_tilt": quality_tilt,
+        "mcap_max": mcap_max,
         "target_exposure": exposure,
         "cash_weight": cash_weight,
-        "params": {"min_mcap_cr": MIN_MCAP_CR, "min_price": MIN_PRICE, "top_quantile": TOP_QUANTILE,
-                   "max_holdings": MAX_HOLDINGS, "report_lag_days": REPORT_LAG_DAYS,
-                   "trend_ma_days": TREND_MA_DAYS, "overlay": overlay, "quality_gate": quality_gate,
-                   "factors": ["momentum_12_1", "value_ey", "value_pb"]},
+        "params": {"min_mcap_cr": MIN_MCAP_CR, "mcap_max_cr": mcap_max, "min_price": MIN_PRICE,
+                   "top_quantile": TOP_QUANTILE, "max_holdings": MAX_HOLDINGS,
+                   "report_lag_days": REPORT_LAG_DAYS, "trend_ma_days": TREND_MA_DAYS,
+                   "overlay": overlay, "quality_gate": quality_gate, "quality_tilt": quality_tilt,
+                   "factors": factor_names},
     }
 
 

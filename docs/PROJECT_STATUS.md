@@ -33,10 +33,12 @@ confirms (~2-3 months). Automation is built ~60%.
   Run: `.venv/bin/python scripts/jarvis_server.py` → http://localhost:7842
 
 **ALSO DONE 2026-07-14:**
-- **Multi-book paper track** (docs/multi_book_design.md) — 3 pre-registered books,
+- **Multi-book paper track** (docs/multi_book_design.md) — 5 pre-registered books,
   ALL inception 2026-07-03: Core (id=1, primary), Trend overlay (id=6), Quality gate
-  (id=7, drops the 9 forensically-flagged names). Each satellite differs from Core by
-  ONE knob. Entered at 07-03 prices (shared names reuse Core's exact entries) — this
+  (id=7, forensic exclusion), Quality tilt (id=8, +quality z-leg = live 3rd-edge test),
+  Small-cap tilt (id=9, mcap≤₹8000cr = where the edge is strongest). Each satellite
+  differs from Core by ONE knob (registry test enforces it). Early 11-day live (noise):
+  Quality-tilt +0.27% leads, Core/Trend -0.08%, Small-cap -0.04%, Quality-gate -0.21%. Entered at 07-03 prices (shared names reuse Core's exact entries) — this
   is legit, not backdating: construction is PIT ≤ 07-03, so measuring forward is real
   OOS. `compute_portfolio(overlay=, quality_gate=, strategy=)`; `run_all_variants`;
   `orchestrate_monthly.py --all`. Discipline: Core is primary, never reallocate to the
