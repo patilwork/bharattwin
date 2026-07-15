@@ -133,9 +133,11 @@ def _mark_to_market(book: dict, qlookup: dict) -> dict:
 
 def build_snapshot() -> dict:
     """Assemble the full live state: shared regime/freshness + every recorded book
-    variant (Core / Trend / Quality) with its own mark-to-market and forensic flags."""
-    from src import quality
+    variant with its own mark-to-market, forensic flags, and Phase-B risk status."""
+    from src import quality, guardrails
     fresh = orchestrator.data_freshness()
+    sector_map = guardrails.load_sector_map()
+    killswitch = guardrails.read_killswitch()
     # regime + as_of computed once (Core signal); reused across books
     core_pf = papertrack.compute_portfolio()
     regime, as_of = core_pf["regime"], core_pf["as_of"]
@@ -155,12 +157,20 @@ def build_snapshot() -> dict:
         if not hb:
             continue
         mtm = _mark_to_market(hb, qlookup)
+        gross = sum(float(h.get("weight", 0) or 0) for h in hb["holdings"])
+        guard = guardrails.evaluate(
+            {"universe_size": core_pf["universe_size"], "target_exposure": gross,
+             "holdings": hb["holdings"]},
+            fresh, sector_map, book_ret_pct=mtm.get("port_ret_pct"))
         books.append({
             "strategy": v["strategy"], "label": v["label"], "primary": v["primary"],
             "overlay": v["overlay"], "quality_gate": v["quality_gate"],
             "id": hb["id"], "as_of": hb["as_of"], "created": hb["created"],
             "notional": hb["notional"], "n_holdings": len(hb["holdings"]),
             "mtm": mtm,
+            "guard": {"status": guard["status"],
+                      "issues": [{"sev": c["severity"], "code": c["code"], "msg": c["msg"]}
+                                 for c in guard["blocking"] + guard["warnings"]]},
         })
 
     return {
@@ -170,6 +180,7 @@ def build_snapshot() -> dict:
         "regime": regime,
         "as_of": as_of,
         "universe_size": core_pf["universe_size"],
+        "killswitch": killswitch,
         "books": books,
         "vitals": VITALS,
     }

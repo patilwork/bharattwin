@@ -195,15 +195,40 @@ def run_monthly(as_of: str | None = None, notional: float = 100_000.0,
     report["held_book"] = {"id": held.get("id"), "as_of": held.get("as_of")}
     report["order_tickets"] = orders
 
-    # 5. record (dup-guarded)
+    # 4b. Phase B guardrails — evaluate the proposed book (and any live drawdown)
+    from src import guardrails
+    sector_map = _sector_map_cached()
+    prior_ret = (score or {}).get("net_pct") if isinstance(score, dict) else None
+    guard = guardrails.evaluate(pf, report["data_freshness"], sector_map,
+                                book_ret_pct=prior_ret, now_ts=report["run_ts"])
+    report["guardrails"] = {"status": guard["status"], "ok_to_record": guard["ok_to_record"],
+                            "blocking": guard["blocking"], "warnings": guard["warnings"]}
+    if guard["should_trip"] and not dry_run:
+        guardrails.trip_killswitch(f"{variant['strategy']}: {guard['blocking']}", report["run_ts"])
+
+    # 5. record (dup-guarded) — BLOCKED if guardrails fail
     existing = papertrack.existing_portfolio_for(pf["as_of"], pf["strategy"])
     if dry_run:
         report["recorded"] = {"portfolio_id": None, "dry_run": True, "existing": existing}
+    elif not guard["ok_to_record"]:
+        report["recorded"] = {"portfolio_id": None, "blocked_by_guardrails":
+                              [c["code"] for c in guard["blocking"]]}
     else:
         pid = papertrack.record_portfolio(pf, notional=notional, live_prices=live_prices)
         report["recorded"] = {"portfolio_id": pid, "existing_blocked": existing if pid is None else None}
 
     return report
+
+
+_SECTOR_MAP = None
+
+
+def _sector_map_cached() -> dict:
+    global _SECTOR_MAP
+    if _SECTOR_MAP is None:
+        from src import guardrails
+        _SECTOR_MAP = guardrails.load_sector_map()
+    return _SECTOR_MAP
 
 
 def run_all_variants(as_of: str | None = None, notional: float = 100_000.0,

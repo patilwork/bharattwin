@@ -232,6 +232,14 @@ Morningstar MCP (server 03b08385-...) covers Indian NSE+BSE stocks. Tested:
 - [ ] Promoter pledge % (shareholding-pattern source)
 
 ### AUTOMATION (the "system that makes money")
+- [x] **Phase B DONE 2026-07-14** — risk guardrails + kill-switch (src/guardrails.py,
+      scripts/guardrails_check.py, docs/phase_b_guardrails.md). Pre-registered limits
+      (name/sector/gross exposure, drawdown halt, data-freshness + universe gates) with
+      BLOCK/WARN/HALT severity. Wired into the orchestrator (blocks recording on hard
+      violations; drawdown breach trips a persistent kill-switch latch that freezes ALL
+      recording until a human resets it) and the HUD (RISK pill + per-book status). All
+      5 live books currently RISK·OK. 62 tests pass. Phase-C upgrades noted (true
+      peak-to-trough DD, append-only risk-event table, order-level pre-trade checks).
 - [x] **Phase A DONE (2026-07-14)** — `src/orchestrator.py` + `scripts/orchestrate_monthly.py`
       + cron wrapper `scripts/monthly_rebalance.sh`. Sequence: data-freshness gate →
       score last elapsed unscored book → form signal WITH trend overlay → BUY/SELL/HOLD

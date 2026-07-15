@@ -122,6 +122,7 @@
     <div class="brand">J.A.R.V.I.S <small>// BHARATTWIN</small></div>
     <div class="pill"><span class="dot live" id="statusDot"></span><span id="statusTxt">connecting</span></div>
     <div class="pill" id="freshPill">DATA · —</div>
+    <div class="pill" id="riskPill">RISK · —</div>
     <div class="spacer"></div>
     <div class="pill" id="verPill">BUILD · —</div>
     <div class="clock" id="clock">--:--:-- UTC</div>
@@ -179,6 +180,7 @@
         <span>BOOK <b id="bookId">—</b></span><span>SINCE <b id="bookAsof">—</b></span>
         <span>NOTIONAL <b id="bookNot">—</b></span><span>MARKS <b id="markSrc">—</b></span>
       </div>
+      <div id="riskLine" style="margin-top:10px;font-size:11px;letter-spacing:.06em"></div>
     </section>
 
     <!-- QUALITY -->
@@ -248,13 +250,22 @@ function renderShared(s){
 
   // book tabs + compare strip
   const books=s.books||[];
+  const gcol = st => st==='OK'?'var(--green)':(st==='WARN'?'var(--amber)':'var(--red)');
   $('bookTabs').innerHTML = books.map((b,i)=>
     `<div class="btab ${i===activeIdx?'active':''}" onclick="selectBook(${i})">${b.label}${b.primary?'<span class="star">★</span>':''}</div>`
   ).join('');
   $('compareStrip').innerHTML = books.map(b=>{
     const pr=b.mtm&&b.mtm.port_ret_pct; const c=clsRet(pr);
-    return `<div class="cmp">${b.label.toUpperCase()}<b class="${c}">${pr==null?'—':fmt(pr,2,'+')+'%'}</b></div>`;
+    const gs=(b.guard&&b.guard.status)||'OK';
+    return `<div class="cmp"><span style="color:${gcol(gs)}">●</span> ${b.label.toUpperCase()}<b class="${c}">${pr==null?'—':fmt(pr,2,'+')+'%'}</b></div>`;
   }).join('');
+
+  // risk pill: kill-switch latch overrides; else worst live book status
+  const ks=s.killswitch||{};
+  const worst = books.reduce((a,b)=>{const o={OK:0,WARN:1,BLOCK:2,HALT:3};return (o[(b.guard&&b.guard.status)||'OK']>o[a])?((b.guard&&b.guard.status)||'OK'):a;},'OK');
+  const rp=$('riskPill');
+  if(ks.tripped){ rp.textContent='⛔ KILL-SWITCH TRIPPED'; rp.style.color='var(--red)'; }
+  else { rp.textContent='RISK · '+worst; rp.style.color=gcol(worst); }
 }
 
 function renderBook(s){
@@ -272,6 +283,13 @@ function renderBook(s){
   $('bookAsof').textContent = b.as_of||'—';   // signal + entry date (entries are as-of prices)
   $('bookNot').textContent = b.notional?('₹'+(b.notional/100000).toFixed(1)+'L'):'—';
   $('markSrc').textContent = m.mark_source==='live_ltp'?'LIVE':'EOD';
+
+  // Phase-B risk status for this book
+  const gd=b.guard||{status:'OK',issues:[]};
+  const gcol2 = st => st==='OK'?'var(--green)':(st==='WARN'?'var(--amber)':'var(--red)');
+  const issues=(gd.issues||[]).map(x=>`<span style="color:${gcol2(x.sev==='WARN'?'WARN':'BLOCK')}">${x.sev} ${x.code}</span>`).join(' · ');
+  $('riskLine').innerHTML = `<span style="color:${gcol2(gd.status)}">● GUARDRAILS ${gd.status}</span>`
+    + (issues?('  '+issues):'  <span class="muted">within all risk limits</span>');
 
   // quality (this book)
   const names=(m.names||[]);
