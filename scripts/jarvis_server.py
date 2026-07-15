@@ -53,6 +53,27 @@ VITALS = {
 
 STATE: dict = {"status": "booting", "snapshot": None, "built_ts": None, "error": None}
 _LOCK = threading.Lock()
+_TRACK = None   # cached monthly backtest series (TWRR source); computed once per session
+
+
+def _track_series() -> list:
+    """Monthly backtest returns (strategy vs Nifty 500) for the TWRR explorer.
+    Heavy (loads the panel) so computed once and cached — it only changes when a
+    new month closes, which won't happen mid-session."""
+    global _TRACK
+    if _TRACK is not None:
+        return _TRACK
+    try:
+        import track_record
+        from xsection_montecarlo import load
+        px, f = load()
+        df = track_record.track(px, f)
+        _TRACK = [{"m": d.strftime("%Y-%m"), "strat": round(float(r.strat) * 100, 3),
+                   "nifty": round(float(r.nifty500) * 100, 3)} for d, r in df.iterrows()]
+    except Exception as e:
+        _TRACK = []
+        print(f"[jarvis] track series failed: {e}", file=sys.stderr)
+    return _TRACK
 
 
 def _latest_closes(symbols: list[str]) -> dict:
@@ -183,6 +204,7 @@ def build_snapshot() -> dict:
         "killswitch": killswitch,
         "books": books,
         "vitals": VITALS,
+        "track": _track_series(),
     }
 
 

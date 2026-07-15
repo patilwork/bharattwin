@@ -201,6 +201,19 @@
     <div class="hgrid" id="hgrid"></div>
   </section>
 
+  <!-- TWRR PERFORMANCE EXPLORER -->
+  <section class="panel holds">
+    <div class="ptitle">Performance · TWRR <span class="bar"></span>
+      <span class="muted" style="letter-spacing:.1em">backtest · time-weighted</span></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+      <div id="twrrBtns" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+      <span class="muted" style="font-size:11px">from</span>
+      <select id="twrrFrom" style="background:rgba(8,16,24,.6);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-family:var(--mono);font-size:12px"></select>
+    </div>
+    <div id="twrrOut" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px"></div>
+    <div id="twrrRange" class="muted" style="font-size:11px;margin-top:10px;letter-spacing:.06em"></div>
+  </section>
+
   <footer>
     <span id="fResearch"></span>
     <span class="spacer"></span>
@@ -316,11 +329,50 @@ function renderBook(s){
 
 function selectBook(i){ activeIdx=i; if(STATE){ renderShared(STATE); renderBook(STATE); } }
 
+let twrrWin='MAX';
+const WINS=[['3M',3],['6M',6],['1Y',12],['2Y',24],['3Y',36],['YTD',null],['MAX',null]];
+function twrr(rets){ return rets.reduce((a,r)=>a*(1+r/100),1)-1; }
+function renderTWRR(s){
+  const t=(s.track||[]); if(!t.length){ $('twrrOut').innerHTML='<span class="muted">no series</span>'; return; }
+  $('twrrBtns').innerHTML=WINS.map(([k])=>`<div class="btab ${k===twrrWin?'active':''}" style="padding:5px 11px" onclick="setTwrr('${k}')">${k}</div>`).join('');
+  if(!$('twrrFrom').options.length){
+    $('twrrFrom').innerHTML='<option value="">— custom —</option>'+t.map(m=>`<option value="${m.m}">${m.m}</option>`).join('');
+    $('twrrFrom').onchange=()=>{ twrrWin='CUSTOM'; renderTWRR(STATE); renderShared(STATE); };
+  }
+  let slice, label;
+  if(twrrWin==='CUSTOM' && $('twrrFrom').value){
+    const f=$('twrrFrom').value; slice=t.filter(m=>m.m>=f); label='since '+f;
+  } else if(twrrWin==='YTD'){
+    const yr=t[t.length-1].m.slice(0,4); slice=t.filter(m=>m.m>=yr+'-01'); label='YTD '+yr;
+  } else {
+    const n=(WINS.find(w=>w[0]===twrrWin)||['MAX',null])[1];
+    slice=n?t.slice(-n):t; label=twrrWin==='MAX'?'since inception':('trailing '+twrrWin);
+  }
+  if(!slice.length){ $('twrrOut').innerHTML='<span class="muted">no data in window</span>'; return; }
+  const n=slice.length;
+  const st=twrr(slice.map(m=>m.strat)), nf=twrr(slice.map(m=>m.nifty));
+  const ann=v=>(Math.pow(1+v,12/n)-1)*100;
+  const card=(lab,cum,annv,col)=>`<div style="background:var(--surface,rgba(8,16,24,.5));background:rgba(8,16,24,.5);border:1px solid var(--line);border-radius:10px;padding:11px 13px">
+    <div class="muted" style="font-size:11px">${lab}</div>
+    <div style="font-size:22px;font-weight:700;color:${col}">${(cum*100>=0?'+':'')+(cum*100).toFixed(1)}%</div>
+    <div class="muted" style="font-size:11px">${(annv>=0?'+':'')+annv.toFixed(1)}%/yr ann</div></div>`;
+  const ex=(st-nf)*100;
+  $('twrrOut').innerHTML =
+    card('STRATEGY', st, ann(st), clsRet(st)==='neg'?'var(--red)':'var(--green)')
+    + card('NIFTY 500', nf, ann(nf), clsRet(nf)==='neg'?'var(--red)':'var(--ink)')
+    + `<div style="background:rgba(8,16,24,.5);border:1px solid var(--line);border-radius:10px;padding:11px 13px">
+        <div class="muted" style="font-size:11px">EXCESS (alpha)</div>
+        <div style="font-size:22px;font-weight:700;color:${ex>=0?'var(--cyan)':'var(--red)'}">${(ex>=0?'+':'')+ex.toFixed(1)}%</div>
+        <div class="muted" style="font-size:11px">${n} months</div></div>`;
+  $('twrrRange').textContent = `${label} · ${slice[0].m} → ${slice[slice.length-1].m} · TWRR = geometrically-linked monthly returns (backtest, in-sample)`;
+}
+function setTwrr(k){ twrrWin=k; $('twrrFrom').value=''; renderTWRR(STATE); }
+
 function render(s){
   if(!s.regime&&!s.error){return;}
   STATE=s;
   $('boot').style.display='none'; $('main').style.display='';
-  renderShared(s); renderBook(s);
+  renderShared(s); renderBook(s); renderTWRR(s);
 }
 
 async function poll(){
