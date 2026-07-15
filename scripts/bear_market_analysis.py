@@ -33,13 +33,13 @@ COST = round_trip_cost(1_000_000, "equity_delivery").total_bps / 1e4 + 0.0025
 MA_DAYS = 200
 
 
-def series(px):
+def series(px, start="2017-01-31"):
     dret = px.pct_change()
     mkt = dret.clip(-0.2, 0.2).mean(axis=1)
     idx = (1 + mkt.fillna(0)).cumprod()
     idx_ma = idx.rolling(MA_DAYS, min_periods=100).mean()
     m = px.resample("ME").last().index
-    rebal = m[(m >= pd.Timestamp("2017-01-31")) & (m <= px.index.max())]
+    rebal = m[(m >= pd.Timestamp(start)) & (m <= px.index.max())]
     pxf = px.ffill()
     pxm = pxf.reindex(pxf.index.union(rebal)).ffill().reindex(rebal)
     idx_at = idx.reindex(idx.index.union(rebal)).ffill().reindex(rebal)
