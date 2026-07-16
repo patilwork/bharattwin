@@ -44,6 +44,13 @@ echo "============================================"
 echo "Refreshing Dawn price panel ..."
 "$PY" scripts/refresh_dawn_prices.py || echo "WARN: price refresh failed; continuing on existing panel"
 
+# Step 0.5: refresh the Dawn FUNDAMENTALS panel (NSE integrated filing) so the VALUE
+# leg picks up new quarterly reports (e.g. Q1 FY27). skip_fresh_days keeps it cheap
+# mid-quarter and only fetches new filings during earnings season. Slow (NSE API per
+# symbol), non-fatal. PIT lag (90d) means new quarters reach the signal ~1 rebalance later.
+echo "Refreshing Dawn fundamentals (NSE integrated filing) ..."
+"$PY" scripts/refresh_dawn_fundamentals.py --skip-fresh-days 90 || echo "WARN: fundamentals refresh failed; continuing on existing fundamentals"
+
 # --dry-run by default is NOT used here: the scheduled job records the paper book.
 # To preview without writing, run manually with --dry-run.
 # Live Kite LTPs (optional): if scripts fetched them to these files, pass them through.
