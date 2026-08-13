@@ -2,9 +2,9 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "jarvis",
+      "name": "friday",
       "runtimeExecutable": ".venv/bin/python",
-      "runtimeArgs": ["scripts/jarvis_server.py", "--port", "7842", "--refresh", "120"],
+      "runtimeArgs": ["scripts/friday_server.py", "--port", "7842", "--refresh", "120"],
       "port": 7842
     }
   ]

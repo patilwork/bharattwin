@@ -56,5 +56,5 @@ none of which happens; the rules are mechanical and pre-registered.)
 
 ## How to run / view
 - Form/refresh all three: `python scripts/orchestrate_monthly.py --all [--dry-run]`
-- Watch them side by side: the JARVIS HUD (`scripts/jarvis_server.py`) now has a
+- Watch them side by side: the FRIDAY HUD (`scripts/friday_server.py`) now has a
   book-switcher and a compare strip showing all three returns at a glance.

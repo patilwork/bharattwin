@@ -1,7 +1,7 @@
 # Phase B — risk guardrails + kill-switch
 
 > `src/guardrails.py`, `scripts/guardrails_check.py`, wired into the orchestrator and
-> the JARVIS HUD. The layer that must PASS before a book is trusted (paper) and,
+> the FRIDAY HUD. The layer that must PASS before a book is trusted (paper) and,
 > later, before any real order (Phase C). PAPER-SAFE — reports and blocks recording;
 > never places or cancels anything.
 

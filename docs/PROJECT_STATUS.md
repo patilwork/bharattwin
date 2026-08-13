@@ -26,11 +26,11 @@ confirms (~2-3 months). Automation is built ~60%.
 - **TIER 2 live quality/forensic overlay** — deep-fundamental snapshot screen,
   9/25 live picks flagged; `--quality` in orchestrator. (src/quality.py)
 - 44 tests pass.
-- **JARVIS live HUD** — `scripts/jarvis_server.py` (+ `jarvis_dashboard.html`,
-  `.claude/launch.json`, docs/jarvis_dashboard.md). Localhost dashboard over the
+- **FRIDAY live HUD** — `scripts/friday_server.py` (+ `friday_dashboard.html`,
+  `.claude/launch.json`, docs/friday_dashboard.md). Localhost dashboard over the
   real state (regime orb, vitals, book MTM, quality flags, holdings). Reuses the
   orchestrator dry-run; optional live marks via `logs/live_ltp.json`. Read-only.
-  Run: `.venv/bin/python scripts/jarvis_server.py` → http://localhost:7842
+  Run: `.venv/bin/python scripts/friday_server.py` → http://localhost:7842
 
 **ALSO DONE 2026-07-14:**
 - **Multi-book paper track** (docs/multi_book_design.md) — 5 pre-registered books,
@@ -53,7 +53,7 @@ confirms (~2-3 months). Automation is built ~60%.
   Wired as step-0 of `monthly_rebalance.sh` (the data "gate" is now a real fetch).
   NSE reachable from this box (HTTP 200). Parser unit-tested. CAVEAT: raw closes;
   corporate actions inside the refresh window not auto-adjusted (rare, short window).
-- **JARVIS HUD is multi-book** — book-switcher tabs + compare strip; marks show LIVE.
+- **FRIDAY HUD is multi-book** — book-switcher tabs + compare strip; marks show LIVE.
   Kite re-auth via the `login` tool when the session expires (user clicks the URL).
 
 **Immediate next task options: Phase B (kill-switch/monitoring: drawdown halt,

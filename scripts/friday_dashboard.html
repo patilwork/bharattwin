@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>JARVIS · BharatTwin</title>
+<title>FRIDAY · BharatTwin</title>
 <style>
   :root{
     --bg:#05080d; --panel:rgba(10,20,30,.55); --line:rgba(0,229,255,.18);
@@ -55,6 +55,36 @@
   .ptitle{font-size:11px;letter-spacing:.28em;color:var(--cyan);text-transform:uppercase;margin:0 0 12px;
     display:flex;align-items:center;gap:8px}
   .ptitle .bar{flex:1;height:1px;background:linear-gradient(90deg,var(--line),transparent)}
+
+  /* long-track additions */
+  select,input[type=number]{background:rgba(8,16,24,.6);color:var(--ink);border:1px solid var(--line);
+    border-radius:6px;padding:5px 8px;font-family:var(--mono);font-size:12px}
+  input[type=number]{width:130px;font-size:14px;letter-spacing:.04em}
+  .capbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px;
+    padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:rgba(8,16,24,.4)}
+  .cpre{border:1px solid var(--line);border-radius:6px;padding:4px 9px;font-size:11px;cursor:pointer;
+    color:var(--ink-dim);letter-spacing:.06em}
+  .cpre:hover,.cpre.active{color:var(--cyan);border-color:var(--cyan);box-shadow:0 0 8px rgba(34,211,238,.25)}
+  .lgd{font-size:11px;color:var(--ink-dim);display:flex;align-items:center;gap:6px;letter-spacing:.06em}
+  .lgd i{width:14px;height:2px;border-radius:1px;display:inline-block}
+  .kcard{background:rgba(8,16,24,.5);border:1px solid var(--line);border-radius:10px;padding:11px 13px}
+  .kcard .kl{font-size:11px;color:var(--ink-dim);letter-spacing:.06em}
+  .kcard .kv{font-size:20px;font-weight:700;margin-top:3px}
+  .kcard .ks{font-size:11px;color:var(--ink-dim);margin-top:2px}
+  .crow{display:grid;grid-template-columns:96px 1fr 118px;align-items:center;gap:10px;
+    font-size:11.5px;padding:3px 0}
+  .ctrack{height:12px;background:rgba(92,125,143,.13);border-radius:3px;overflow:hidden}
+  .ctrack i{display:block;height:100%;border-radius:3px}
+  .cval{text-align:right;color:var(--ink-dim)}
+  .txcol{background:rgba(8,16,24,.4);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .txcol h4{margin:0 0 8px;font-size:11px;letter-spacing:.16em;font-weight:600}
+  .txn{display:inline-block;font-size:11px;padding:2px 7px;margin:2px 3px 2px 0;border-radius:5px;
+    border:1px solid var(--line);color:var(--ink)}
+  .turnstrip{display:flex;gap:2px;align-items:flex-end;height:56px}
+  .turnstrip i{flex:1;min-width:2px;background:var(--cyan-dim);border-radius:1px 1px 0 0;cursor:pointer;
+    transition:background .15s}
+  .turnstrip i:hover{background:var(--cyan)}
+  .turnstrip i.sel{background:var(--amber)}
 
   /* vitals */
   .vrow{display:flex;justify-content:space-between;align-items:baseline;padding:7px 0;border-bottom:1px dashed rgba(92,125,143,.18)}
@@ -119,7 +149,7 @@
 <body>
 <div class="wrap">
   <header>
-    <div class="brand">J.A.R.V.I.S <small>// BHARATTWIN</small></div>
+    <div class="brand">F.R.I.D.A.Y <small>// BHARATTWIN</small></div>
     <div class="pill"><span class="dot live" id="statusDot"></span><span id="statusTxt">connecting</span></div>
     <div class="pill" id="freshPill">DATA · —</div>
     <div class="pill" id="riskPill">RISK · —</div>
@@ -201,17 +231,61 @@
     <div class="hgrid" id="hgrid"></div>
   </section>
 
-  <!-- TWRR PERFORMANCE EXPLORER -->
+  <!-- TWRR PERFORMANCE EXPLORER + LONG-HORIZON EQUITY CURVE -->
   <section class="panel holds">
     <div class="ptitle">Performance · TWRR <span class="bar"></span>
-      <span class="muted" style="letter-spacing:.1em">backtest · time-weighted</span></div>
+      <span class="muted" style="letter-spacing:.1em" id="ltSpan">backtest · time-weighted</span></div>
+
+    <div class="capbar">
+      <span class="muted" style="font-size:11px;letter-spacing:.1em">STARTING CAPITAL ₹</span>
+      <input id="capIn" type="number" min="10000" step="50000" value="1000000">
+      <div id="capPresets" style="display:flex;gap:5px;flex-wrap:wrap"></div>
+      <span class="spacer"></span>
+      <span class="muted" style="font-size:11px" id="capNote"></span>
+    </div>
+
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
       <div id="twrrBtns" style="display:flex;gap:6px;flex-wrap:wrap"></div>
       <span class="muted" style="font-size:11px">from</span>
-      <select id="twrrFrom" style="background:rgba(8,16,24,.6);color:var(--ink);border:1px solid var(--line);border-radius:6px;padding:5px 8px;font-family:var(--mono);font-size:12px"></select>
+      <select id="twrrFrom"></select>
     </div>
     <div id="twrrOut" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px"></div>
     <div id="twrrRange" class="muted" style="font-size:11px;margin-top:10px;letter-spacing:.06em"></div>
+
+    <div style="margin-top:16px">
+      <div style="display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-bottom:6px">
+        <span class="lgd"><i style="background:var(--green)"></i>Strategy (net)</span>
+        <span class="lgd"><i style="background:var(--cyan)"></i>NIFTY 500</span>
+        <span class="lgd"><i style="background:var(--ink-dim)"></i>NIFTY 50</span>
+        <span class="spacer"></span>
+        <span class="muted" style="font-size:10px">equity on starting capital · drawdown below</span>
+      </div>
+      <svg id="eqChart" viewBox="0 0 1000 300" preserveAspectRatio="none"
+           style="width:100%;height:300px;display:block;overflow:visible"></svg>
+      <svg id="ddChart" viewBox="0 0 1000 90" preserveAspectRatio="none"
+           style="width:100%;height:90px;display:block;overflow:visible;margin-top:4px"></svg>
+    </div>
+  </section>
+
+  <!-- TRANSACTION COST TRACKER -->
+  <section class="panel holds">
+    <div class="ptitle">Transaction costs · brokerage &amp; STT <span class="bar"></span>
+      <span class="muted" style="letter-spacing:.1em" id="costModel">—</span></div>
+    <div id="costCards" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:14px"></div>
+    <div id="costBars"></div>
+    <div id="costNote" class="muted" style="font-size:11px;margin-top:12px;letter-spacing:.05em"></div>
+  </section>
+
+  <!-- REBALANCE / TRANSACTION LOG -->
+  <section class="panel holds">
+    <div class="ptitle">Rebalance log · buys &amp; sells <span class="bar"></span>
+      <select id="txnMonth"></select></div>
+    <div id="txnSummary" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:14px"></div>
+    <div id="txnOut" style="display:grid;grid-template-columns:1fr 1fr;gap:14px"></div>
+    <div style="margin-top:16px">
+      <div class="muted" style="font-size:11px;letter-spacing:.1em;margin-bottom:6px">TURNOVER BY MONTH · click to inspect</div>
+      <div id="turnStrip" class="turnstrip"></div>
+    </div>
   </section>
 
   <footer>
@@ -329,17 +403,21 @@ function renderBook(s){
 
 function selectBook(i){ activeIdx=i; if(STATE){ renderShared(STATE); renderBook(STATE); } }
 
-let twrrWin='MAX';
-const WINS=[['3M',3],['6M',6],['1Y',12],['2Y',24],['3Y',36],['YTD',null],['MAX',null]];
+let twrrWin='MAX', txnSel=null, CAP=1000000;
+const WINS=[['1Y',12],['2Y',24],['3Y',36],['5Y',60],['YTD',null],['MAX',null]];
+const PRESETS=[100000,500000,1000000,2500000,10000000];
 function twrr(rets){ return rets.reduce((a,r)=>a*(1+r/100),1)-1; }
-function renderTWRR(s){
-  const t=(s.track||[]); if(!t.length){ $('twrrOut').innerHTML='<span class="muted">no series</span>'; return; }
-  $('twrrBtns').innerHTML=WINS.map(([k])=>`<div class="btab ${k===twrrWin?'active':''}" style="padding:5px 11px" onclick="setTwrr('${k}')">${k}</div>`).join('');
-  if(!$('twrrFrom').options.length){
-    $('twrrFrom').innerHTML='<option value="">— custom —</option>'+t.map(m=>`<option value="${m.m}">${m.m}</option>`).join('');
-    $('twrrFrom').onchange=()=>{ twrrWin='CUSTOM'; renderTWRR(STATE); renderShared(STATE); };
-  }
-  let slice, label;
+function LT(s){ const t=(s&&s.track)||{}; return (t&&t.months)?t:{meta:{},months:[],summary:{},costs:{}}; }
+function inr(v){
+  const a=Math.abs(v);
+  if(a>=1e7) return '₹'+(v/1e7).toFixed(2)+' Cr';
+  if(a>=1e5) return '₹'+(v/1e5).toFixed(2)+' L';
+  return '₹'+Math.round(v).toLocaleString('en-IN');
+}
+function scale(s){ const c=LT(s).meta.capital||1000000; return CAP/c; }
+
+function winSlice(t){
+  let slice,label;
   if(twrrWin==='CUSTOM' && $('twrrFrom').value){
     const f=$('twrrFrom').value; slice=t.filter(m=>m.m>=f); label='since '+f;
   } else if(twrrWin==='YTD'){
@@ -348,31 +426,151 @@ function renderTWRR(s){
     const n=(WINS.find(w=>w[0]===twrrWin)||['MAX',null])[1];
     slice=n?t.slice(-n):t; label=twrrWin==='MAX'?'since inception':('trailing '+twrrWin);
   }
+  return [slice,label];
+}
+
+function renderTWRR(s){
+  const L=LT(s), t=L.months;
+  if(!t.length){ $('twrrOut').innerHTML='<span class="muted">no series — run scripts/long_track.py</span>'; return; }
+  $('ltSpan').textContent=(L.meta.strategy||'')+' · '+L.meta.start+'→'+L.meta.end+' · net of costs';
+  $('twrrBtns').innerHTML=WINS.map(([k])=>`<div class="btab ${k===twrrWin?'active':''}" style="padding:5px 11px" onclick="setTwrr('${k}')">${k}</div>`).join('');
+  if(!$('twrrFrom').options.length){
+    $('twrrFrom').innerHTML='<option value="">— custom —</option>'+t.map(m=>`<option value="${m.m}">${m.m}</option>`).join('');
+    $('twrrFrom').onchange=()=>{ twrrWin='CUSTOM'; renderAll(STATE); };
+    $('capPresets').innerHTML=PRESETS.map(p=>`<div class="cpre ${p===CAP?'active':''}" onclick="setCap(${p})">${inr(p)}</div>`).join('');
+    $('capIn').value=CAP;
+    $('capIn').oninput=()=>{ const v=+$('capIn').value; if(v>0){ CAP=v; renderAll(STATE);} };
+  }
+  const [slice,label]=winSlice(t);
   if(!slice.length){ $('twrrOut').innerHTML='<span class="muted">no data in window</span>'; return; }
   const n=slice.length;
-  const st=twrr(slice.map(m=>m.strat)), nf=twrr(slice.map(m=>m.nifty));
-  const ann=v=>(Math.pow(1+v,12/n)-1)*100;
-  const card=(lab,cum,annv,col)=>`<div style="background:var(--surface,rgba(8,16,24,.5));background:rgba(8,16,24,.5);border:1px solid var(--line);border-radius:10px;padding:11px 13px">
-    <div class="muted" style="font-size:11px">${lab}</div>
-    <div style="font-size:22px;font-weight:700;color:${col}">${(cum*100>=0?'+':'')+(cum*100).toFixed(1)}%</div>
-    <div class="muted" style="font-size:11px">${(annv>=0?'+':'')+annv.toFixed(1)}%/yr ann</div></div>`;
-  const ex=(st-nf)*100;
+  const st=twrr(slice.map(m=>m.strat));
+  const av5=slice.filter(m=>m.n500!==null), av1=slice.filter(m=>m.n50!==null);
+  const nf=av5.length?twrr(av5.map(m=>m.n500)):null;
+  const n1=av1.length?twrr(av1.map(m=>m.n50)):null;
+  // annualise each series over ITS OWN month count — the indices can have fewer
+  // months than the strategy (benchmark_tri_daily lags), and using n for all of
+  // them would understate the index CAGR.
+  const ann=(v,mo)=>(Math.pow(1+v,12/(mo||n))-1)*100;
+  const card=(lab,cum,sub,col)=>`<div class="kcard"><div class="kl">${lab}</div>
+    <div class="kv" style="color:${col}">${cum===null?'n/a':(cum*100>=0?'+':'')+(cum*100).toFixed(1)+'%'}</div>
+    <div class="ks">${sub}</div></div>`;
+  const ex=(nf===null)?null:(st-nf)*100;
   $('twrrOut').innerHTML =
-    card('STRATEGY', st, ann(st), clsRet(st)==='neg'?'var(--red)':'var(--green)')
-    + card('NIFTY 500', nf, ann(nf), clsRet(nf)==='neg'?'var(--red)':'var(--ink)')
-    + `<div style="background:rgba(8,16,24,.5);border:1px solid var(--line);border-radius:10px;padding:11px 13px">
-        <div class="muted" style="font-size:11px">EXCESS (alpha)</div>
-        <div style="font-size:22px;font-weight:700;color:${ex>=0?'var(--cyan)':'var(--red)'}">${(ex>=0?'+':'')+ex.toFixed(1)}%</div>
-        <div class="muted" style="font-size:11px">${n} months</div></div>`;
-  $('twrrRange').textContent = `${label} · ${slice[0].m} → ${slice[slice.length-1].m} · TWRR = geometrically-linked monthly returns (backtest, in-sample)`;
+    card('STRATEGY (net)', st, (ann(st,n)>=0?'+':'')+ann(st,n).toFixed(1)+'%/yr · '+inr(CAP*(1+st)), st<0?'var(--red)':'var(--green)')
+    + card('NIFTY 500', nf, nf===null?'no index data':((ann(nf,av5.length)>=0?'+':'')+ann(nf,av5.length).toFixed(1)+'%/yr · '+inr(CAP*(1+nf))), nf===null?'var(--ink-dim)':(nf<0?'var(--red)':'var(--cyan)'))
+    + card('NIFTY 50', n1, n1===null?'no index data':((ann(n1,av1.length)>=0?'+':'')+ann(n1,av1.length).toFixed(1)+'%/yr · '+inr(CAP*(1+n1))), n1===null?'var(--ink-dim)':'var(--ink)')
+    + card('EXCESS vs N500', ex===null?null:ex/100, n+' months'+(av5.length<n?' · '+(n-av5.length)+' w/o index':''), ex===null?'var(--ink-dim)':(ex>=0?'var(--cyan)':'var(--red)'));
+  $('twrrRange').textContent = `${label} · ${slice[0].m} → ${slice[slice.length-1].m} · TWRR = geometrically-linked monthly returns (walk-forward backtest, in-sample)`;
+  renderEquity(slice);
 }
-function setTwrr(k){ twrrWin=k; $('twrrFrom').value=''; renderTWRR(STATE); }
+
+function renderEquity(slice){
+  const eq=$('eqChart'), dd=$('ddChart'); eq.innerHTML=''; dd.innerHTML='';
+  if(slice.length<2) return;
+  const W=1000,H=300,ML=64,MR=10,MT=12,MB=22;
+  const b0=slice[0];
+  const ser=[['cum_strat','var(--green)',2.2],['cum_n500','var(--cyan)',1.8],['cum_n50','var(--ink-dim)',1.6]];
+  const vals=[]; ser.forEach(([k])=>slice.forEach(m=>vals.push(CAP*m[k]/b0[k])));
+  let lo=Math.min(...vals),hi=Math.max(...vals); const pd=(hi-lo)*.08; lo-=pd; hi+=pd;
+  const X=i=>ML+(W-ML-MR)*(i/(slice.length-1));
+  const Y=v=>MT+(H-MT-MB)*(1-(v-lo)/(hi-lo));
+  const mk=(t,a)=>{const e=document.createElementNS('http://www.w3.org/2000/svg',t);for(const k in a)e.setAttribute(k,a[k]);return e;};
+  for(let i=0;i<=4;i++){ const v=lo+(hi-lo)*i/4,y=Y(v);
+    eq.appendChild(mk('line',{x1:ML,x2:W-MR,y1:y,y2:y,stroke:'rgba(92,125,143,.16)','stroke-width':1}));
+    const tx=mk('text',{x:ML-8,y:y+4,'text-anchor':'end',fill:'#5c7d8f','font-size':11,'font-family':'var(--mono)'});
+    tx.textContent=inr(v); eq.appendChild(tx); }
+  slice.forEach((m,i)=>{ if(i%Math.ceil(slice.length/8)&&i!==slice.length-1)return;
+    const tx=mk('text',{x:X(i),y:H-6,'text-anchor':'middle',fill:'#5c7d8f','font-size':10,'font-family':'var(--mono)'});
+    tx.textContent=m.m; eq.appendChild(tx); });
+  ser.forEach(([k,col,w])=>{
+    const d=slice.map((m,i)=>(i?'L':'M')+X(i)+' '+Y(CAP*m[k]/b0[k])).join('');
+    eq.appendChild(mk('path',{d,fill:'none',stroke:col,'stroke-width':w,'stroke-linejoin':'round'}));
+  });
+  // drawdown (strategy), rebased to the window
+  let peak=-1e18; const dds=slice.map(m=>{const v=m.cum_strat; peak=Math.max(peak,v); return (v/peak-1)*100;});
+  const dlo=Math.min(-1,...dds), DH=90,DM=14;
+  const DY=v=>4+(DH-DM)*(v/dlo);
+  dd.appendChild(mk('line',{x1:ML,x2:W-MR,y1:DY(0),y2:DY(0),stroke:'rgba(92,125,143,.3)','stroke-width':1}));
+  const dpath=dds.map((v,i)=>(i?'L':'M')+X(i)+' '+DY(v)).join('')+`L${X(dds.length-1)} ${DY(0)}L${X(0)} ${DY(0)}Z`;
+  dd.appendChild(mk('path',{d:dpath,fill:'rgba(255,77,109,.22)',stroke:'var(--red)','stroke-width':1.4}));
+  const tx=mk('text',{x:ML-8,y:DY(dlo)+4,'text-anchor':'end',fill:'#5c7d8f','font-size':11,'font-family':'var(--mono)'});
+  tx.textContent=dlo.toFixed(0)+'%'; dd.appendChild(tx);
+}
+
+const COSTKEYS=[['stt','STT'],['impact','Impact'],['slippage','Slippage'],['stamp','Stamp duty'],
+                ['brokerage','Brokerage'],['exchange','Exchange'],['gst','GST'],['sebi','SEBI fee']];
+function renderCosts(s){
+  const L=LT(s), c=L.costs||{}, t=L.months, k=scale(s);
+  if(!t.length||!c.total){ $('costCards').innerHTML='<span class="muted">no cost data</span>'; return; }
+  const [slice]=winSlice(t);
+  const sub={}; COSTKEYS.forEach(([kk])=>sub[kk]=slice.reduce((a,m)=>a+(m.cb?m.cb[kk]:0),0)*k);
+  const tot=slice.reduce((a,m)=>a+m.cost,0)*k;
+  const traded=slice.reduce((a,m)=>a+m.traded,0)*k;
+  const gross=twrr(slice.map(m=>m.gross)), net=twrr(slice.map(m=>m.strat));
+  const yrs=slice.length/12;
+  const dragYr=(Math.pow(1+gross,1/yrs)-Math.pow(1+net,1/yrs))*100;
+  $('costModel').textContent=`${L.meta.segment||''} · ${L.meta.round_trip_bps||'—'}bps round-trip`;
+  $('costCards').innerHTML=
+    `<div class="kcard"><div class="kl">TOTAL COST</div><div class="kv" style="color:var(--red)">${inr(tot)}</div>
+      <div class="ks">${(tot/CAP*100).toFixed(1)}% of starting capital</div></div>`+
+    `<div class="kcard"><div class="kl">CAGR DRAG</div><div class="kv" style="color:var(--amber)">−${dragYr.toFixed(2)}pp</div>
+      <div class="ks">gross ${(gross*100).toFixed(0)}% → net ${(net*100).toFixed(0)}%</div></div>`+
+    `<div class="kcard"><div class="kl">TRADED VALUE</div><div class="kv">${inr(traded)}</div>
+      <div class="ks">${slice.length} rebalances</div></div>`+
+    `<div class="kcard"><div class="kl">STT PAID</div><div class="kv" style="color:var(--ink)">${inr(sub.stt)}</div>
+      <div class="ks">${(sub.stt/tot*100).toFixed(0)}% of all cost</div></div>`;
+  const mx=Math.max(...COSTKEYS.map(([kk])=>sub[kk]));
+  $('costBars').innerHTML=COSTKEYS.map(([kk,lab])=>{
+    const v=sub[kk], pct=tot?v/tot*100:0;
+    const col=kk==='stt'?'var(--cyan)':kk==='impact'?'var(--amber)':kk==='brokerage'?'var(--green)':'var(--cyan-dim)';
+    return `<div class="crow"><span class="muted">${lab}</span>
+      <span class="ctrack"><i style="width:${mx?v/mx*100:0}%;background:${col}"></i></span>
+      <span class="cval">${inr(v)} · ${pct.toFixed(1)}%</span></div>`;
+  }).join('');
+  $('costNote').innerHTML=`Brokerage is ₹0 — <b>equity_delivery</b> is modelled free (Zerodha-style). `+
+    `Impact is a ${L.meta.impact_bps}bps/side proxy, not measured (no volume data) — it is `+
+    `${(sub.impact/tot*100).toFixed(0)}% of modelled cost, so the cost estimate is only as good as that assumption. `+
+    `STT is the real, unavoidable ${(sub.stt/tot*100).toFixed(0)}%.`;
+}
+
+function renderTxns(s){
+  const L=LT(s), t=L.months, k=scale(s);
+  if(!t.length){ $('txnOut').innerHTML='<span class="muted">no transactions</span>'; return; }
+  if(!$('txnMonth').options.length || $('txnMonth').options.length!==t.length){
+    $('txnMonth').innerHTML=t.map(m=>`<option value="${m.m}">${m.m}</option>`).join('');
+    $('txnMonth').value=t[t.length-1].m;
+    $('txnMonth').onchange=()=>{ txnSel=$('txnMonth').value; renderTxns(STATE); };
+  }
+  const sel=txnSel||t[t.length-1].m;
+  $('txnMonth').value=sel;
+  const m=t.find(x=>x.m===sel)||t[t.length-1];
+  $('txnSummary').innerHTML=
+    `<div class="kcard"><div class="kl">TURNOVER</div><div class="kv" style="color:${m.turnover>50?'var(--amber)':'var(--ink)'}">${m.turnover.toFixed(0)}%</div><div class="ks">${m.n} holdings</div></div>`+
+    `<div class="kcard"><div class="kl">TRADED</div><div class="kv">${inr(m.traded*k)}</div><div class="ks">sold + re-bought</div></div>`+
+    `<div class="kcard"><div class="kl">COST</div><div class="kv" style="color:var(--red)">${inr(m.cost*k)}</div><div class="ks">${(m.cost/m.equity*100).toFixed(2)}% of book</div></div>`+
+    `<div class="kcard"><div class="kl">NET RETURN</div><div class="kv" style="color:${m.strat<0?'var(--red)':'var(--green)'}">${(m.strat>=0?'+':'')+m.strat.toFixed(2)}%</div><div class="ks">gross ${(m.gross>=0?'+':'')+m.gross.toFixed(2)}%</div></div>`;
+  const chips=(a,col)=>a.length?a.map(x=>`<span class="txn" style="border-color:${col};color:${col}">${x}</span>`).join(''):'<span class="muted" style="font-size:11px">none</span>';
+  $('txnOut').innerHTML=
+    `<div class="txcol"><h4 style="color:var(--green)">BUY · ${m.buys.length}</h4>${chips(m.buys,'var(--green)')}</div>`+
+    `<div class="txcol"><h4 style="color:var(--red)">SELL · ${m.sells.length}</h4>${chips(m.sells,'var(--red)')}</div>`;
+  const mxT=Math.max(...t.map(x=>x.turnover));
+  $('turnStrip').innerHTML=t.map(x=>`<i class="${x.m===sel?'sel':''}" style="height:${x.turnover/mxT*100}%"
+      title="${x.m} · turnover ${x.turnover.toFixed(0)}% · cost ${inr(x.cost*k)}" onclick="pickTxn('${x.m}')"></i>`).join('');
+}
+function pickTxn(m){ txnSel=m; renderTxns(STATE); }
+function setTwrr(k){ twrrWin=k; $('twrrFrom').value=''; renderAll(STATE); }
+function setCap(v){ CAP=v; $('capIn').value=v;
+  $('capPresets').innerHTML=PRESETS.map(p=>`<div class="cpre ${p===CAP?'active':''}" onclick="setCap(${p})">${inr(p)}</div>`).join('');
+  renderAll(STATE); }
+function renderAll(s){ if(!s)return; renderTWRR(s); renderCosts(s); renderTxns(s);
+  $('capNote').textContent=`backtest ran on ${inr(LT(s).meta.capital||0)} — figures rescale linearly`; }
 
 function render(s){
   if(!s.regime&&!s.error){return;}
   STATE=s;
   $('boot').style.display='none'; $('main').style.display='';
-  renderShared(s); renderBook(s); renderTWRR(s);
+  renderShared(s); renderBook(s); renderAll(s);
 }
 
 async function poll(){

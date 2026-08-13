@@ -1,6 +1,6 @@
-# JARVIS — live HUD for the super-quant paper book
+# FRIDAY — live HUD for the super-quant paper book
 
-A self-contained, Jarvis-style dashboard over the BharatTwin strategy. Everything
+A self-contained, Friday-style dashboard over the BharatTwin strategy. Everything
 it shows is REAL, pulled from the tested modules — no mock data.
 
 ## Run it
@@ -8,7 +8,7 @@ it shows is REAL, pulled from the tested modules — no mock data.
 cd ~/Developer/bharattwin
 DATABASE_URL=postgresql://localhost:5432/bharattwin \
 DAWN_URL=postgresql://localhost:5432/dawn \
-.venv/bin/python scripts/jarvis_server.py --port 7842 --refresh 120
+.venv/bin/python scripts/friday_server.py --port 7842 --refresh 120
 # open http://localhost:7842
 ```
 No web-framework dependency (Python stdlib `http.server`). A background thread
@@ -39,5 +39,5 @@ rebuilds the heavy snapshot every `--refresh` seconds; the browser polls
 ## Notes
 - Read-only, PAPER ONLY — the server never places or modifies orders.
 - Binds to 127.0.0.1 (localhost) only.
-- Also launchable via the Browser pane: `preview_start {name: "jarvis"}`
+- Also launchable via the Browser pane: `preview_start {name: "friday"}`
   (see `.claude/launch.json`).

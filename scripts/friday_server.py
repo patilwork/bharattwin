@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-JARVIS — live HUD for the BharatTwin super-quant paper book.
+FRIDAY — live HUD for the BharatTwin super-quant paper book.
 
 A tiny stdlib http.server (no web-framework dependency) that serves a self-
-contained Jarvis-style dashboard and a /api/state JSON feed. State is REAL: it
+contained Friday-style dashboard and a /api/state JSON feed. State is REAL: it
 reuses the tested modules — the Tier-1.2 trend regime, the Tier-2 quality/forensic
 screen, Dawn data-freshness, and the live paper_portfolio — via one orchestrator
 dry-run (nothing is written). A background thread refreshes the heavy snapshot on
@@ -15,7 +15,7 @@ e.g. fetched via the Kite MCP in an interactive session). If absent, the book sh
 entry prices and an "awaiting live marks" state — honest, not faked.
 
 Usage:
-  DATABASE_URL=... DAWN_URL=... python3 scripts/jarvis_server.py [--port 7842] [--refresh 90]
+  DATABASE_URL=... DAWN_URL=... python3 scripts/friday_server.py [--port 7842] [--refresh 90]
   then open http://localhost:7842
 """
 from __future__ import annotations
@@ -37,8 +37,9 @@ from src import orchestrator, papertrack
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
-HTML_PATH = HERE / "jarvis_dashboard.html"
+HTML_PATH = HERE / "friday_dashboard.html"
 LIVE_LTP_PATH = REPO / "logs" / "live_ltp.json"
+LONG_TRACK_PATH = REPO / "logs" / "long_track.json"
 BHARAT_URL = os.environ.get("DATABASE_URL", "postgresql://localhost:5432/bharattwin")
 DAWN_URL = os.environ.get("DAWN_URL", "postgresql://localhost:5432/dawn")
 
@@ -56,23 +57,42 @@ _LOCK = threading.Lock()
 _TRACK = None   # cached monthly backtest series (TWRR source); computed once per session
 
 
-def _track_series() -> list:
-    """Monthly backtest returns (strategy vs Nifty 500) for the TWRR explorer.
-    Heavy (loads the panel) so computed once and cached — it only changes when a
-    new month closes, which won't happen mid-session."""
+def _long_track() -> dict:
+    """The long-horizon walk-forward record produced by scripts/long_track.py:
+    monthly net returns vs NIFTY 500/50, per-rebalance buy/sell lists, and the
+    itemised cost stack. Read from disk (logs/long_track.json) rather than
+    recomputed — the backtest loads the whole panel and takes minutes, and it
+    only changes when a new month closes. Regenerate with:
+        python3 scripts/long_track.py --years 10 --json logs/long_track.json
+    Falls back to the old 3-year in-process track if the file is absent."""
     global _TRACK
     if _TRACK is not None:
         return _TRACK
+    try:
+        _TRACK = json.loads(LONG_TRACK_PATH.read_text())
+        return _TRACK
+    except FileNotFoundError:
+        print(f"[friday] {LONG_TRACK_PATH.name} missing — falling back to 3y track",
+              file=sys.stderr)
+    except Exception as e:
+        print(f"[friday] long track unreadable ({e}) — falling back", file=sys.stderr)
     try:
         import track_record
         from xsection_montecarlo import load
         px, f = load()
         df = track_record.track(px, f)
-        _TRACK = [{"m": d.strftime("%Y-%m"), "strat": round(float(r.strat) * 100, 3),
-                   "nifty": round(float(r.nifty500) * 100, 3)} for d, r in df.iterrows()]
+        _TRACK = {"meta": {"start": df.index[0].strftime("%Y-%m"),
+                           "end": df.index[-1].strftime("%Y-%m"),
+                           "months": len(df), "capital": 1_000_000.0,
+                           "strategy": "momentum+value", "fallback": True},
+                  "months": [{"m": d.strftime("%Y-%m"),
+                              "strat": round(float(r.strat) * 100, 3),
+                              "n500": round(float(r.nifty500) * 100, 3)}
+                             for d, r in df.iterrows()],
+                  "summary": {}, "costs": {}}
     except Exception as e:
-        _TRACK = []
-        print(f"[jarvis] track series failed: {e}", file=sys.stderr)
+        _TRACK = {"meta": {}, "months": [], "summary": {}, "costs": {}}
+        print(f"[friday] track series failed: {e}", file=sys.stderr)
     return _TRACK
 
 
@@ -204,7 +224,7 @@ def build_snapshot() -> dict:
         "killswitch": killswitch,
         "books": books,
         "vitals": VITALS,
-        "track": _track_series(),
+        "track": _long_track(),
     }
 
 
@@ -262,15 +282,15 @@ def main():
         STATE.update(status="online", snapshot=build_snapshot(), built_ts=time.time())
     except Exception as e:
         STATE.update(status="error", error=f"{type(e).__name__}: {e}")
-        print(f"[jarvis] initial snapshot failed: {e}", file=sys.stderr)
+        print(f"[friday] initial snapshot failed: {e}", file=sys.stderr)
 
     threading.Thread(target=_refresh_loop, args=(args.refresh,), daemon=True).start()
     srv = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
-    print(f"[jarvis] online at http://localhost:{args.port}  (refresh {args.refresh}s)")
+    print(f"[friday] online at http://localhost:{args.port}  (refresh {args.refresh}s)")
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
-        print("\n[jarvis] shutting down")
+        print("\n[friday] shutting down")
 
 
 if __name__ == "__main__":
